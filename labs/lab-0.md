@@ -163,6 +163,14 @@ docker push ${IMAGE}
 
 **預期看到的結果**：最後一行類似 `v1: digest: sha256:... size: ...`。
 
+> **推送失敗時**（例如出現 `connect: connection refused` 或 `i/o timeout`）：
+> 1. 先再執行一次 `docker push ${IMAGE}`，網路暫時不穩時重試通常就會成功（已經上傳的部分不會重傳）。
+> 2. 還是失敗，檢查 Cloud Shell 連不連得到 Artifact Registry：
+>    ```bash
+>    curl -sS -o /dev/null -w "%{http_code}\n" https://${REGION}-docker.pkg.dev/v2/
+>    ```
+>    印出 `401` 代表連得到（只是還沒登入，屬正常）；這時重新啟動 Cloud Shell（終端機右上角「⋮」→「重新啟動」）。重新啟動後，建置好的映像檔和變數都會消失，請回到程式碼資料夾，重新執行步驟 1 的變數設定，以及這一步的 `gcloud auth configure-docker`、`export IMAGE`、`docker build`，再推送一次。
+
 4. 確認映像檔已經在存放區：
 
 **Console**：Artifact Registry →「存放區」→ 點 `quiz-helper` → 看到映像檔 `quiz-helper`，點進去有一個標記（tag）為 `v1` 的版本。

@@ -1,0 +1,38 @@
+# 在 main 最新的 commit 打上（或移動）lab-N tag。
+# 給課程維護者用，學員不需要理會這個檔案。
+# 用法：GitHub →「Actions」→「打上或移動 lab tag」→「Run workflow」，輸入 lab-0～lab-6。
+# tag 已經存在時會移到 main 最新的 commit（實測修正後使用）。
+name: 打上或移動 lab tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要打的 tag（lab-0～lab-6）"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 打上 tag 並推送
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${TAG}" =~ ^lab-[0-6]$ ]]; then
+            echo "tag 必須是 lab-0～lab-6，收到：${TAG}"
+            exit 1
+          fi
+          git init -q .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch -q --depth=1 origin main
+          echo "舊位置：$(git ls-remote --tags origin "refs/tags/${TAG}" | cut -f1)"
+          git tag -f "${TAG}" FETCH_HEAD
+          git push -f origin "refs/tags/${TAG}"
+          echo "新位置：$(git rev-parse FETCH_HEAD)（main 最新的 commit）"
