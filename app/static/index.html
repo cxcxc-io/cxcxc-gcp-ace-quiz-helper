@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>考題小幫手</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>考題小幫手</h1>
+    <span class="muted">版本 <span id="version">-</span>｜<a href="/admin">管理頁面</a></span>
+  </header>
+
+  <!-- 暱稱：只存在瀏覽器（localStorage），不驗證、不註冊 -->
+  <section id="nickname-box" class="card">
+    <label for="nickname">請輸入暱稱</label><br>
+    <input id="nickname" type="text" maxlength="30" placeholder="例如：小明">
+    <button id="start">開始答題</button>
+  </section>
+
+  <section id="quiz" class="card hidden">
+    <p class="muted">暱稱：<span id="who"></span>（<button class="link" id="change-name">更換</button>）｜題號 <span id="qid"></span></p>
+    <p id="question-cn"></p>
+    <p id="question-en" class="muted"></p>
+    <p id="multi-hint" class="muted hidden"></p>
+    <div id="options"></div>
+    <button id="submit">送出答案</button>
+    <button id="next" class="hidden">下一題</button>
+  </section>
+
+  <section id="result" class="card hidden">
+    <p id="result-title"></p>
+    <div id="explanation-box" class="hidden"><strong>解析</strong><pre id="explanation"></pre></div>
+    <div id="comment-box" class="hidden"><br><strong>講師評語</strong><pre id="comment"></pre></div>
+  </section>
+
+  <p id="message" class="muted"></p>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let current = null;    // 目前的題目
+let shownAt = 0;       // 題目顯示的時間，用來算作答時間
+
+function show(id, visible) { $(id).classList.toggle("hidden", !visible); }
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
+function start() {
+  const name = $("nickname").value.trim();
+  if (!name) { $("message").textContent = "請先輸入暱稱"; return; }
+  localStorage.setItem("nickname", name);
+  $("who").textContent = name;
+  show("nickname-box", false);
+  nextQuestion();
+}
+
+async function nextQuestion() {
+  $("message").textContent = "";
+  show("result", false);
+  try {
+    current = await api("/api/question");
+  } catch (e) {
+    $("message").textContent = e.message;
+    return;
+  }
+  $("version").textContent = current.version;
+  $("qid").textContent = current.question_id;
+  $("question-cn").textContent = current.question_cn;
+  $("question-en").textContent = current.question_en;
+
+  // 單選題用圓形選項，複選題用方形核取方塊
+  const multi = current.answer_count > 1;
+  $("multi-hint").textContent = `複選題：請選 ${current.answer_count} 個`;
+  show("multi-hint", multi);
+
+  $("options").innerHTML = "";
+  for (const o of current.options) {
+    const label = document.createElement("label");
+    label.className = "option";
+    label.dataset.key = o.key;
+    const input = document.createElement("input");
+    input.type = multi ? "checkbox" : "radio";
+    input.name = "choice";
+    input.value = o.key;
+    const text = document.createElement("div");
+    text.innerHTML = `<div>(${o.key}) <span class="en"></span></div><div class="cn"></div>`;
+    text.querySelector(".en").textContent = o.en;
+    text.querySelector(".cn").textContent = o.cn;
+    label.append(input, text);
+    $("options").append(label);
+  }
+
+  show("quiz", true);
+  show("submit", true);
+  show("next", false);
+  shownAt = Date.now();
+}
+
+async function submit() {
+  const choice = [...document.querySelectorAll("input[name=choice]:checked")].map((i) => i.value).join("");
+  if (!choice) { $("message").textContent = "請先選擇答案"; return; }
+  $("message").textContent = "";
+  $("submit").disabled = true;
+  try {
+    const r = await api("/api/answer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nickname: localStorage.getItem("nickname"),
+        question_id: current.question_id,
+        choice: choice,
+        elapsed_ms: Date.now() - shownAt,
+      }),
+    });
+    showResult(r);
+  } catch (e) {
+    $("message").textContent = e.message;
+  } finally {
+    $("submit").disabled = false;
+  }
+}
+
+function showResult(r) {
+  $("result-title").textContent = r.correct ? "答對了！" : `答錯了，正確答案是 ${r.answer}`;
+  $("result-title").className = r.correct ? "result-ok" : "result-bad";
+  // 把正確答案的選項標成綠色
+  for (const label of document.querySelectorAll(".option")) {
+    label.classList.toggle("answer", r.answer.includes(label.dataset.key));
+  }
+  $("explanation").textContent = r.explanation;
+  $("comment").textContent = r.expert_comment;
+  show("explanation-box", !!r.explanation);
+  show("comment-box", !!r.expert_comment);
+  show("result", true);
+  show("submit", false);
+  show("next", true);
+}
+
+$("start").onclick = start;
+$("nickname").onkeydown = (e) => { if (e.key === "Enter") start(); };
+$("submit").onclick = submit;
+$("next").onclick = nextQuestion;
+$("change-name").onclick = () => { show("quiz", false); show("result", false); show("nickname-box", true); };
+
+// 之前輸入過暱稱就直接開始
+const saved = localStorage.getItem("nickname");
+if (saved) { $("nickname").value = saved; start(); }
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 
 1. **一次只做一個 tag。** 只做使用者指定的 lab-N 範圍（見 SPEC 第 4、5 節），不要提前做下一個 tag 的內容，也不要「順便」重構其他階段。
 2. **做完就停下來。** 開 PR 後回報，等使用者實測。不要自行接著做下一個 tag。
-3. **不要打 git tag。** tag 由使用者在人工實測通過、PR 合併後自己打。
+3. **tag 在 PR 合併後由你打在 `main` 上，使用者對 tag 實測。** 使用者合併 PR（或明確要你合併）後，在 `main` 最新的 commit 打 `lab-N` 並推送；實測發現問題時，修正走新的 PR，合併後把同一個 tag 移到新的 commit（`git tag -f`、`git push -f origin lab-N`）。不要把 tag 打在 PR 分支上；實測通過前不要開始下一個 tag。
 4. **不要碰任何 GCP 憑證。** 不要要求、建立或提交服務帳戶金鑰、API 金鑰、`.env` 憑證。程式一律使用平台提供的身分（Application Default Credentials）。
 5. **你無法存取 GCP 專案。** 不要宣稱已經部署或驗證過任何雲端步驟；雲端行為一律寫成「請人工實測」。
 6. **不確定就標出來，不要猜。** 涉及目前狀態的事（角色名稱、指令參數、預設值、Console 選單位置、模型名稱、價格），能查官方文件就查；查不到就在 PR 說明的「待確認」列出。SPEC 第 7 節已列的待查證事項，碰到時要特別處理。
@@ -35,6 +35,7 @@
 - Cloud Storage 指令用 `gcloud storage`，不用 `gsutil`
 - 產品名稱用 Google 現行名稱（例如 Gemini Enterprise Agent Platform，必要時註明舊稱 Vertex AI）
 - 指令要能直接複製執行；用 shell 變數（例如 `PROJECT_ID`、`REGION`）取代需要學員手動替換的值
+- 取得程式碼：「在 Cloud Shell 中開啟」一鍵按鈕只放在 Lab 0（整門課只下載一次）。lab-1 之後**不要再放一鍵按鈕**，開頭改用 `labs/lab-0.md` 步驟 1 方法 B 的那段指令（資料夾 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper` 已存在就切進去並 `git fetch --tags`，不存在才下載），只把 `git checkout` 換成該 Lab 的 tag
 
 ## 開 PR 前的自我檢查
 
@@ -53,6 +54,6 @@
 
 ## 版本命名
 
-- git tag：`lab-0`～`lab-6`（由使用者打）
+- git tag：`lab-0`～`lab-6`（PR 合併後打在 `main` 上，實測通過前可移動）
 - 容器映像檔標記：`v1`、`v1.1`、`v2`
 - 兩者刻意分開命名，不要混用
