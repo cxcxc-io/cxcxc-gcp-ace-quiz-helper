@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小幫手管理頁面</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>管理頁面：匯入題庫</h1>
+    <span class="muted"><a href="/">回答題頁面</a></span>
+  </header>
+
+  <section class="card">
+    <p>值區：<strong id="bucket">讀取中…</strong></p>
+    <p class="muted">把題庫 CSV 上傳到這個值區，再按「匯入」寫進 Firestore。同一個題號重複匯入會覆蓋舊的題目。</p>
+    <button id="reload">重新整理清單</button>
+    <table id="files"></table>
+  </section>
+
+  <section class="card">
+    <strong>匯入結果</strong>
+    <pre id="output" class="muted">（尚未匯入）</pre>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
+async function loadFiles() {
+  $("files").innerHTML = "";
+  try {
+    const r = await api("/api/admin/csv-files");
+    $("bucket").textContent = r.bucket;
+    if (r.files.length === 0) {
+      $("files").innerHTML = "<tr><td>值區裡還沒有 CSV 檔</td></tr>";
+    }
+    for (const name of r.files) {
+      const row = $("files").insertRow();
+      row.insertCell().textContent = name;
+      const button = document.createElement("button");
+      button.textContent = "匯入";
+      button.onclick = () => importFile(name, button);
+      row.insertCell().append(button);
+    }
+  } catch (e) {
+    $("bucket").textContent = "（無法讀取）";
+    $("output").textContent = e.message;
+  }
+}
+
+async function importFile(name, button) {
+  button.disabled = true;
+  $("output").textContent = `匯入 ${name} 中…`;
+  try {
+    const r = await api("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ object: name }),
+    });
+    const lines = [`${r.object}：匯入 ${r.imported} 題，略過 ${r.skipped.length} 列`];
+    for (const s of r.skipped) lines.push(`  第 ${s.line} 行：${s.reason}`);
+    $("output").textContent = lines.join("\n");
+  } catch (e) {
+    $("output").textContent = e.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("reload").onclick = loadFiles;
+loadFiles();
+</script>
+</body>
+</html>
