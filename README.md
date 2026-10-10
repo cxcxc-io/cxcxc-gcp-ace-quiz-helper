@@ -6,6 +6,14 @@
 - 各階段步驟說明：[`labs/`](labs/)（從 [`labs/lab-0.md`](labs/lab-0.md) 開始）
 - 每個階段完成時會打一個 git tag（`lab-0`～`lab-6`），用 `git checkout lab-N` 切到該階段的起點
 
+## 一鍵在 Cloud Shell 開啟
+
+| 階段 | 開啟 |
+| --- | --- |
+| Lab 0：打包 | [![在 Cloud Shell 中開啟](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-0&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-0.md) |
+
+按下按鈕後，程式碼會下載到 Cloud Shell 的 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper`，並切到該階段的 tag。出現「信任此存放區（Trust repo）」選項時請勾選。
+
 ## 資料夾
 
 ```

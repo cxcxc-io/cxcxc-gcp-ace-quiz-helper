@@ -35,8 +35,45 @@
 
 ## 步驟 1：開啟 Cloud Shell，取得程式碼
 
-1. 在 Console 右上角按「啟用 Cloud Shell」圖示（`>_`）。
-2. 確認目前的專案是你上課要用的專案，然後設定變數：
+### 方法 A：一鍵開啟（建議）
+
+按下面的按鈕，Cloud Shell 編輯器（Cloud Shell Editor）會自動下載這個儲存庫、切到 Lab 0 的起點（`lab-0`），並打開這份說明。
+
+[![在 Cloud Shell 中開啟](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-0&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-0.md)
+
+1. 用上課的 Google 帳號登入，出現確認視窗時：
+   - 若有「信任此存放區（Trust repo）」的選項，**請勾選**，再按「確認（Confirm）」
+   - 沒有勾選的話，Cloud Shell 會用「暫時環境」開啟：關掉後檔案會消失，也可能無法使用你的帳號權限，後面的步驟會失敗
+2. 等待下載完成，左側檔案總管會出現 `app`、`data`、`labs` 等資料夾，右側打開 `labs/lab-0.md`。
+3. 在下方的終端機（terminal）確認目前位置：
+
+```bash
+cd ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
+git describe --tags
+ls
+```
+
+**預期看到的結果**：`git describe --tags` 顯示 `lab-0`；`ls` 列出 `app`、`data`、`Dockerfile`、`labs`、`requirements.txt` 等檔案。
+
+### 方法 B：手動下載（一鍵開啟失敗時使用）
+
+在 Console 右上角按「啟用 Cloud Shell」圖示（`>_`），在終端機執行：
+
+```bash
+mkdir -p ~/cloudshell_open && cd ~/cloudshell_open
+git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git
+cd cxcxc-gcp-ace-quiz-helper
+git checkout lab-0
+ls
+```
+
+**預期看到的結果**：同方法 A。
+
+> 兩種方法都把程式碼放在 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper`，之後的 Lab 都在這個資料夾操作。
+
+### 設定專案與變數
+
+確認目前的專案是你上課要用的專案，然後設定變數：
 
 ```bash
 gcloud config set project <你的專案 ID>   # 只有這一行要自己換成專案 ID
@@ -45,19 +82,9 @@ export REGION=asia-east1
 echo "專案：${PROJECT_ID}，區域：${REGION}"
 ```
 
-3. 下載程式碼，切到 Lab 0 的起點：
+**預期看到的結果**：印出「專案：<你的專案 ID>，區域：asia-east1」。
 
-```bash
-cd ~
-git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git
-cd cxcxc-gcp-ace-quiz-helper
-git checkout lab-0
-ls
-```
-
-**預期看到的結果**：`ls` 列出 `app`、`data`、`Dockerfile`、`labs`、`requirements.txt` 等檔案。
-
-> Cloud Shell 閒置一段時間會斷線，重新連上後，`PROJECT_ID`、`REGION` 變數會消失，請重新執行上面的 `export` 兩行。
+> Cloud Shell 閒置一段時間會斷線，重新連上後，`PROJECT_ID`、`REGION` 變數會消失，請重新執行上面的 `export` 兩行，並 `cd ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper` 回到程式碼資料夾。
 
 ## 步驟 2：啟用需要的 API
 
@@ -244,8 +271,8 @@ gcloud billing budgets list --billing-account=${BILLING_ACCOUNT} \
 # 刪除 Firestore 資料庫（會刪掉裡面所有資料；不刪也幾乎不花錢）
 gcloud firestore databases delete --database="(default)" --quiet
 
-# 刪除 Cloud Shell 中下載的程式碼
-rm -rf ~/cxcxc-gcp-ace-quiz-helper
+# 刪除 Cloud Shell 中下載的程式碼（先離開該資料夾）
+cd ~ && rm -rf ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
 ```
 
 > 最徹底的做法是在課程結束後直接關閉整個專案：`gcloud projects delete ${PROJECT_ID}`。
