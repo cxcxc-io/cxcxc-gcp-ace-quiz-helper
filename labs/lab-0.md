@@ -35,7 +35,10 @@
 
 ## 步驟 1：開啟 Cloud Shell，取得程式碼
 
-### 方法 A：一鍵開啟（建議）
+> **整門課只下載一次。** 之後每個 Lab 都沿用同一個資料夾 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper`，只要切到該 Lab 的 tag。
+> 一鍵按鈕**只在這裡按一次**：每按一次，Cloud Shell 就可能再下載一份，產生好幾個同名資料夾。
+
+### 方法 A：一鍵開啟（第一次使用，建議）
 
 按下面的按鈕，Cloud Shell 編輯器（Cloud Shell Editor）會自動下載這個儲存庫、切到 Lab 0 的起點（`lab-0`），並打開這份說明。
 
@@ -55,21 +58,25 @@ ls
 
 **預期看到的結果**：`git describe --tags` 顯示 `lab-0`；`ls` 列出 `app`、`data`、`Dockerfile`、`labs`、`requirements.txt` 等檔案。
 
-### 方法 B：手動下載（一鍵開啟失敗時使用）
+### 方法 B：用指令下載或切換（一鍵開啟失敗、或已經下載過時使用）
 
-在 Console 右上角按「啟用 Cloud Shell」圖示（`>_`），在終端機執行：
+在 Console 右上角按「啟用 Cloud Shell」圖示（`>_`），在終端機執行下面這段。
+資料夾已經存在就直接切進去、更新 tag；不存在才下載，**不會產生重複的資料夾**。之後每個 Lab 開頭都用這一段，只把最後一行的 `lab-0` 換成該 Lab 的 tag。
 
 ```bash
-mkdir -p ~/cloudshell_open && cd ~/cloudshell_open
-git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git
-cd cxcxc-gcp-ace-quiz-helper
+REPO_DIR=~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
+if [ -d "${REPO_DIR}/.git" ]; then
+  cd "${REPO_DIR}" && git fetch --tags --force
+else
+  git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git "${REPO_DIR}" && cd "${REPO_DIR}"
+fi
 git checkout lab-0
 ls
 ```
 
-**預期看到的結果**：同方法 A。
+**預期看到的結果**：最後出現 `HEAD is now at ...`（或 `HEAD 目前位於 ...`），`ls` 列出的檔案同方法 A。
 
-> 兩種方法都把程式碼放在 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper`，之後的 Lab 都在這個資料夾操作。
+> 若 `git checkout` 顯示「Your local changes ... would be overwritten」，代表你改過資料夾裡的檔案。先執行 `git stash` 把修改暫存起來，再重新執行 `git checkout`。
 
 ### 設定專案與變數
 

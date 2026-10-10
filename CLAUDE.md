@@ -35,6 +35,7 @@
 - Cloud Storage 指令用 `gcloud storage`，不用 `gsutil`
 - 產品名稱用 Google 現行名稱（例如 Gemini Enterprise Agent Platform，必要時註明舊稱 Vertex AI）
 - 指令要能直接複製執行；用 shell 變數（例如 `PROJECT_ID`、`REGION`）取代需要學員手動替換的值
+- 取得程式碼：「在 Cloud Shell 中開啟」一鍵按鈕只放在 Lab 0（整門課只下載一次）。lab-1 之後**不要再放一鍵按鈕**，開頭改用 `labs/lab-0.md` 步驟 1 方法 B 的那段指令（資料夾 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper` 已存在就切進去並 `git fetch --tags`，不存在才下載），只把 `git checkout` 換成該 Lab 的 tag
 
 ## 開 PR 前的自我檢查
 
