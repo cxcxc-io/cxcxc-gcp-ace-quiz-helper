@@ -199,7 +199,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 ### 階段 0：打包
 
-- 在 Cloud Shell 建置映像檔，推到 Artifact Registry（標記 v1）
+- 在 Cloud Shell 用 Cloud Build（`gcloud builds submit`）建置映像檔，推到 Artifact Registry（標記 v1）
 - 建立 Firestore (default) 資料庫
 - 設定預算警示
 - 對應章節：DevSecOps（Artifact Registry）

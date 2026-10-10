@@ -2,7 +2,7 @@
 
 > 階段 0｜映像檔版本 `v1`｜對應章節：DevSecOps（Artifact Registry）
 
-小幫手要上雲了。這一段先把應用打包成容器映像檔（container image），推到 Artifact Registry；再把之後要用的 Firestore 資料庫和預算警示準備好。
+小幫手要上雲了。這一段先用 Cloud Build 把應用打包成容器映像檔（container image），推到 Artifact Registry；再把之後要用的 Firestore 資料庫和預算警示準備好。
 **這一段還不會把小幫手跑起來**，下一段（Lab 1）才會部署到 VM 上。
 
 ## 完成後你會有
@@ -11,13 +11,14 @@
 | --- | --- | --- |
 | Artifact Registry 存放區（repository） | `quiz-helper` | Artifact Registry → 存放區 |
 | 容器映像檔 | `quiz-helper:v1` | 點進 `quiz-helper` 存放區 |
+| Cloud Build 建置紀錄 | 一筆狀態為「成功」的建置 | Cloud Build → 記錄 |
 | Firestore 資料庫 | `(default)`，原生模式（Native mode） | Firestore → 資料庫 |
 | 預算（budget）與警示 | `quiz-helper 預算` | 帳單 → 預算與快訊 |
 
 ## 需要的角色
 
 - 專案：**擁有者（Owner，`roles/owner`）**。課程使用自己的專案，直接用擁有者最省事。
-  - 若不是擁有者，至少需要：Service Usage 管理員（`roles/serviceusage.serviceUsageAdmin`）、Artifact Registry 管理員（`roles/artifactregistry.admin`）、Cloud Datastore 擁有者（`roles/datastore.owner`）
+  - 若不是擁有者，至少需要：Service Usage 管理員（`roles/serviceusage.serviceUsageAdmin`）、Artifact Registry 管理員（`roles/artifactregistry.admin`）、Cloud Build 編輯者（`roles/cloudbuild.builds.editor`）、Storage 管理員（`roles/storage.admin`，上傳建置用的原始碼）、專案 IAM 管理員（`roles/resourcemanager.projectIamAdmin`，授予建置用服務帳戶角色）、Cloud Datastore 擁有者（`roles/datastore.owner`）
 - 帳單帳戶（billing account）：**帳單帳戶管理員（Billing Account Administrator）** 或 **帳單帳戶費用管理員（Billing Account Costs Manager）**，才能建立預算
 
 ## 可能產生的費用
@@ -25,7 +26,9 @@
 | 項目 | 說明 |
 | --- | --- |
 | Cloud Shell | 免費 |
+| Cloud Build | 有每月免費的建置分鐘數；建置一次約 1～2 分鐘 |
 | Artifact Registry | 每月前 0.5 GB 儲存空間免費；小幫手映像檔在免費額度內 |
+| Cloud Storage | Cloud Build 會把上傳的原始碼放在 `<專案 ID>_cloudbuild` 值區，只有幾百 KB |
 | Firestore | 有每日免費額度（讀取、寫入、儲存空間）；本課程用量很小 |
 | 預算警示 | 免費 |
 
@@ -98,6 +101,8 @@ echo "專案：${PROJECT_ID}，區域：${REGION}"
 **Console**：導覽選單 →「API 和服務」→「程式庫」，分別搜尋並啟用：
 
 - Artifact Registry API
+- Cloud Build API
+- Compute Engine API（Cloud Build 預設使用 Compute Engine 的預設服務帳戶，啟用後才會出現這個帳戶；Lab 1 也會用到）
 - Cloud Firestore API
 - Cloud Billing Budget API
 
@@ -106,11 +111,13 @@ echo "專案：${PROJECT_ID}，區域：${REGION}"
 ```bash
 gcloud services enable \
   artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  compute.googleapis.com \
   firestore.googleapis.com \
   billingbudgets.googleapis.com
 ```
 
-**預期看到的結果**：指令跑完出現 `Operation "operations/..." finished successfully.`（已經啟用過的話不會有任何輸出，也算成功）。
+**預期看到的結果**：指令跑完出現 `Operation "operations/..." finished successfully.`（已經啟用過的話不會有任何輸出，也算成功）。啟用 Compute Engine API 可能要等一兩分鐘。
 
 ## 步驟 3：建立 Artifact Registry 存放區
 
@@ -138,40 +145,47 @@ gcloud artifacts repositories list --location=${REGION}
 
 列表中有一列 `quiz-helper`，FORMAT 是 `DOCKER`，LOCATION 是 `asia-east1`。
 
-## 步驟 4：建置映像檔並推送
+## 步驟 4：用 Cloud Build 建置映像檔並推送
 
-1. 讓 Docker 能推送到 Artifact Registry（只需要做一次）：
+這一步不在 Cloud Shell 裡跑 Docker，而是把程式碼上傳給 Cloud Build，由 Cloud Build 在雲端照 `Dockerfile` 建置映像檔，完成後直接推到 Artifact Registry。
+
+1. 授予 Cloud Build 使用的服務帳戶建置所需的角色（只需要做一次）：
+
+Cloud Build 預設以 Compute Engine 預設服務帳戶（`<專案編號>-compute@developer.gserviceaccount.com`）執行建置。授予它「Cloud Build 服務帳戶（Cloud Build Service Account）」角色，它才能讀取上傳的原始碼、推送映像檔、寫入建置紀錄。
+
+**Console**：導覽選單 →「IAM 與管理」→「IAM」→「授予存取權」
+
+- 新增主體：`<專案編號>-compute@developer.gserviceaccount.com`（專案編號在 Console 首頁的「專案資訊」卡片）
+- 角色：「Cloud Build 服務帳戶」
+- →「儲存」
+
+**gcloud**：
 
 ```bash
-gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.builder" \
+  --condition=None
 ```
 
-2. 組出映像檔的完整名稱，建置映像檔：
+**預期看到的結果**：印出專案的 IAM 政策，其中有一段 `role: roles/cloudbuild.builds.builder`，`members` 包含 `serviceAccount:<專案編號>-compute@developer.gserviceaccount.com`。
+
+2. 組出映像檔的完整名稱，送出建置：
 
 ```bash
+cd ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
 export IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1
-docker build -t ${IMAGE} .
+gcloud builds submit --tag ${IMAGE} .
 ```
 
-**預期看到的結果**：最後一行出現 `naming to asia-east1-docker.pkg.dev/<專案 ID>/quiz-helper/quiz-helper:v1`（或 `Successfully tagged ...`），沒有 `ERROR`。
+**預期看到的結果**：畫面會持續印出建置過程的紀錄，最後出現一個表格，`STATUS` 欄位是 `SUCCESS`，`IMAGES` 欄位是 `asia-east1-docker.pkg.dev/<專案 ID>/quiz-helper/quiz-helper:v1`。
 
-3. 推送：
+**Console**：導覽選單 →「Cloud Build」→「記錄」，可以看到這次建置，狀態為「成功」，點進去可以看完整的建置紀錄。
 
-```bash
-docker push ${IMAGE}
-```
+> 若出現權限錯誤（`PERMISSION_DENIED` 或 `does not have ... access`），通常是第 1 小步的角色還沒生效，等一兩分鐘後再執行一次 `gcloud builds submit`。
 
-**預期看到的結果**：最後一行類似 `v1: digest: sha256:... size: ...`。
-
-> **推送失敗時**（例如出現 `connect: connection refused` 或 `i/o timeout`）：
-> 1. 先再執行一次 `docker push ${IMAGE}`，網路暫時不穩時重試通常就會成功（已經上傳的部分不會重傳）。
-> 2. 還是失敗，檢查 Cloud Shell 連不連得到 Artifact Registry：
->    ```bash
->    curl -sS -o /dev/null -w "%{http_code}\n" https://${REGION}-docker.pkg.dev/v2/
->    ```
->    印出 `401` 代表連得到（只是還沒登入，屬正常）；這時重新啟動 Cloud Shell（終端機右上角「⋮」→「重新啟動」）。重新啟動後，建置好的映像檔和變數都會消失，請回到程式碼資料夾，重新執行步驟 1 的變數設定，以及這一步的 `gcloud auth configure-docker`、`export IMAGE`、`docker build`，再推送一次。
-
-4. 確認映像檔已經在存放區：
+3. 確認映像檔已經在存放區：
 
 **Console**：Artifact Registry →「存放區」→ 點 `quiz-helper` → 看到映像檔 `quiz-helper`，點進去有一個標記（tag）為 `v1` 的版本。
 
@@ -261,6 +275,7 @@ gcloud billing budgets list --billing-account=${BILLING_ACCOUNT}
 
 ## 本段檢查清單
 
+- [ ] Cloud Build 記錄裡有一筆成功的建置
 - [ ] Artifact Registry 有 `quiz-helper` 存放區（asia-east1），裡面有 `quiz-helper:v1`
 - [ ] Firestore 有 `(default)` 資料庫，原生模式、asia-east1
 - [ ] 帳單有 `quiz-helper 預算`
@@ -275,6 +290,16 @@ export REGION=asia-east1
 
 # 刪除 Artifact Registry 存放區（連同裡面所有映像檔）
 gcloud artifacts repositories delete quiz-helper --location=${REGION} --quiet
+
+# 刪除 Cloud Build 存放上傳原始碼的值區
+gcloud storage rm -r gs://${PROJECT_ID}_cloudbuild
+
+# 移除授予 Compute Engine 預設服務帳戶的 Cloud Build 角色
+export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
+gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudbuild.builds.builder" \
+  --condition=None
 
 # 刪除預算
 export BILLING_ACCOUNT=$(gcloud billing projects describe ${PROJECT_ID} \
