@@ -18,7 +18,7 @@
 ## 需要的角色
 
 - 專案：**擁有者（Owner，`roles/owner`）**。課程使用自己的專案，直接用擁有者最省事。
-  - 若不是擁有者，至少需要：Service Usage 管理員（`roles/serviceusage.serviceUsageAdmin`）、Artifact Registry 管理員（`roles/artifactregistry.admin`）、Cloud Build 編輯者（`roles/cloudbuild.builds.editor`）、Storage 管理員（`roles/storage.admin`，上傳建置用的原始碼）、專案 IAM 管理員（`roles/resourcemanager.projectIamAdmin`，授予建置用服務帳戶角色）、Cloud Datastore 擁有者（`roles/datastore.owner`）
+  - 若不是擁有者，至少需要：Service Usage 管理員（`roles/serviceusage.serviceUsageAdmin`）、Artifact Registry 管理員（`roles/artifactregistry.admin`）、Cloud Build 編輯者（`roles/cloudbuild.builds.editor`）、Storage 管理員（`roles/storage.admin`，上傳建置用的原始碼）、Cloud Datastore 擁有者（`roles/datastore.owner`）
 - 帳單帳戶（billing account）：**帳單帳戶管理員（Billing Account Administrator）** 或 **帳單帳戶費用管理員（Billing Account Costs Manager）**，才能建立預算
 
 ## 可能產生的費用
@@ -102,7 +102,6 @@ echo "專案：${PROJECT_ID}，區域：${REGION}"
 
 - Artifact Registry API
 - Cloud Build API
-- Compute Engine API（Cloud Build 預設使用 Compute Engine 的預設服務帳戶，啟用後才會出現這個帳戶；Lab 1 也會用到）
 - Cloud Firestore API
 - Cloud Billing Budget API
 
@@ -112,12 +111,11 @@ echo "專案：${PROJECT_ID}，區域：${REGION}"
 gcloud services enable \
   artifactregistry.googleapis.com \
   cloudbuild.googleapis.com \
-  compute.googleapis.com \
   firestore.googleapis.com \
   billingbudgets.googleapis.com
 ```
 
-**預期看到的結果**：指令跑完出現 `Operation "operations/..." finished successfully.`（已經啟用過的話不會有任何輸出，也算成功）。啟用 Compute Engine API 可能要等一兩分鐘。
+**預期看到的結果**：指令跑完出現 `Operation "operations/..." finished successfully.`（已經啟用過的話不會有任何輸出，也算成功）。
 
 ## 步驟 3：建立 Artifact Registry 存放區
 
@@ -149,29 +147,7 @@ gcloud artifacts repositories list --location=${REGION}
 
 這一步不在 Cloud Shell 裡跑 Docker，而是把程式碼上傳給 Cloud Build，由 Cloud Build 在雲端照 `Dockerfile` 建置映像檔，完成後直接推到 Artifact Registry。
 
-1. 授予 Cloud Build 使用的服務帳戶建置所需的角色（只需要做一次）：
-
-Cloud Build 預設以 Compute Engine 預設服務帳戶（`<專案編號>-compute@developer.gserviceaccount.com`）執行建置。授予它「Cloud Build 服務帳戶（Cloud Build Service Account）」角色，它才能讀取上傳的原始碼、推送映像檔、寫入建置紀錄。
-
-**Console**：導覽選單 →「IAM 與管理」→「IAM」→「授予存取權」
-
-- 新增主體：`<專案編號>-compute@developer.gserviceaccount.com`（專案編號在 Console 首頁的「專案資訊」卡片）
-- 角色：「Cloud Build 服務帳戶」
-- →「儲存」
-
-**gcloud**：
-
-```bash
-export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
-gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-  --role="roles/cloudbuild.builds.builder" \
-  --condition=None
-```
-
-**預期看到的結果**：印出專案的 IAM 政策，其中有一段 `role: roles/cloudbuild.builds.builder`，`members` 包含 `serviceAccount:<專案編號>-compute@developer.gserviceaccount.com`。
-
-2. 組出映像檔的完整名稱，送出建置：
+1. 組出映像檔的完整名稱，送出建置：
 
 ```bash
 cd ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
@@ -183,9 +159,18 @@ gcloud builds submit --tag ${IMAGE} .
 
 **Console**：導覽選單 →「Cloud Build」→「記錄」，可以看到這次建置，狀態為「成功」，點進去可以看完整的建置紀錄。
 
-> 若出現權限錯誤（`PERMISSION_DENIED` 或 `does not have ... access`），通常是第 1 小步的角色還沒生效，等一兩分鐘後再執行一次 `gcloud builds submit`。
+> **若出現權限錯誤**（`PERMISSION_DENIED` 或 `does not have ... access`）：代表執行建置的服務帳戶權限不足（例如公司或學校組織的專案，預設服務帳戶不會自動取得權限）。授予 Compute Engine 預設服務帳戶「Cloud Build 服務帳戶」角色後，等一兩分鐘再執行一次 `gcloud builds submit`：
+>
+> ```bash
+> gcloud services enable compute.googleapis.com
+> export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
+> gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+>   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+>   --role="roles/cloudbuild.builds.builder" \
+>   --condition=None
+> ```
 
-3. 確認映像檔已經在存放區：
+2. 確認映像檔已經在存放區：
 
 **Console**：Artifact Registry →「存放區」→ 點 `quiz-helper` → 看到映像檔 `quiz-helper`，點進去有一個標記（tag）為 `v1` 的版本。
 
@@ -294,7 +279,7 @@ gcloud artifacts repositories delete quiz-helper --location=${REGION} --quiet
 # 刪除 Cloud Build 存放上傳原始碼的值區
 gcloud storage rm -r gs://${PROJECT_ID}_cloudbuild
 
-# 移除授予 Compute Engine 預設服務帳戶的 Cloud Build 角色
+# （只有做過步驟 4「權限錯誤」的處理才需要）移除授予 Compute Engine 預設服務帳戶的 Cloud Build 角色
 export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
 gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
