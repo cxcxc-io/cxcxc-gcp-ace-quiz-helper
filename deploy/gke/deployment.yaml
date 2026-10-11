@@ -1,0 +1,52 @@
+# 小幫手的 Deployment：同時執行好幾個一樣的 Pod，其中一個掛了，其他的照樣服務。
+#
+# ${IMAGE} 在套用時用 sed 換成映像檔的完整名稱：
+#   sed "s|\${IMAGE}|${IMAGE}|g" deploy/gke/deployment.yaml | kubectl apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quiz-helper
+  labels:
+    app: quiz-helper
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: quiz-helper
+  # 滾動更新：一次多開一個新版 Pod，等它準備好才關掉一個舊版，更新過程不中斷服務
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: quiz-helper
+    spec:
+      serviceAccountName: quiz-helper   # 見 serviceaccount.yaml
+      containers:
+        - name: quiz-helper
+          image: ${IMAGE}
+          ports:
+            - containerPort: 8080
+          # Autopilot 依這裡的資源需求計費；HPA 也用 CPU 需求的百分比判斷要不要擴充
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 250m
+              memory: 512Mi
+          # 健康檢查：/healthz 回應正常才開始接流量，不正常就重新啟動容器
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10

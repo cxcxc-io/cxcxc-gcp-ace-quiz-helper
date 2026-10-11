@@ -74,6 +74,8 @@ def get_question():
         "question_cn": q["question_cn"],
         "options": q["options"],
         "answer_count": len(q["answer"]),   # 複選題要選幾個
+        "domain": q.get("domain", ""),      # v1.1 起：畫面顯示題目的主題
+        "services": q.get("services", ""),  # v1.1 起：畫面顯示相關服務
         "version": APP_VERSION,
     }
 

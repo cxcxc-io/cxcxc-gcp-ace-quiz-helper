@@ -1,8 +1,8 @@
 # 考題小幫手（quiz-helper）容器映像檔
 FROM python:3.14-slim
 
-# 映像檔版本，會寫進每一筆紀錄的 app_version；建置時可用 --build-arg APP_VERSION=v1.1 覆寫
-ARG APP_VERSION=v1
+# 映像檔版本，會寫進每一筆紀錄的 app_version，也會顯示在畫面上
+ARG APP_VERSION=v1.1
 ENV APP_VERSION=${APP_VERSION} \
     PORT=8080 \
     PYTHONUNBUFFERED=1 \

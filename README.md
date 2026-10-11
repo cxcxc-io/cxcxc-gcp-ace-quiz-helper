@@ -39,6 +39,8 @@ app/                應用程式碼
 Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          Lab 1：VM 開機指令碼、自訂角色「小幫手值區」定義
+deploy/gke/         Lab 2：Kubernetes 服務帳戶、Deployment、Service、HPA 設定檔
+loadtest/           壓測腳本（只呼叫答題，不呼叫問 AI）
 labs/               每個階段的步驟說明；catchup.sh 是跟不上進度時用的補進度腳本
 tests/              單元測試
 ```

@@ -1,0 +1,13 @@
+# 小幫手的 Service：建立一個對外的負載平衡器，把流量平均分給所有 Pod。
+# 外部 80 埠 → Pod 的 8080 埠
+apiVersion: v1
+kind: Service
+metadata:
+  name: quiz-helper
+spec:
+  type: LoadBalancer
+  selector:
+    app: quiz-helper
+  ports:
+    - port: 80
+      targetPort: 8080

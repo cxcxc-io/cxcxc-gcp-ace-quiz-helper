@@ -2,7 +2,8 @@
 # 補進度腳本：一鍵建立某個 Lab 起點需要的雲端資源。
 #
 # 用法（在程式碼資料夾裡執行）：
-#   bash labs/catchup.sh 1     # 準備好 Lab 1 的起點（也就是 Lab 0 的成果）
+#   bash labs/catchup.sh 1     # 準備好 Lab 1 的起點（Lab 0 的成果）
+#   bash labs/catchup.sh 2     # 準備好 Lab 2 的起點（Lab 0、Lab 1 的成果）
 #
 # - 只給跟不上進度的學員用；照 Lab 一步步做的學員不需要執行
 # - 一開始會列出你的專案讓你選，選好後自動切換（gcloud config set project）
@@ -112,7 +113,13 @@ catchup_lab0() {
   if gcloud artifacts docker images describe "${image}" >/dev/null 2>&1; then
     skip
   else
-    (cd "${REPO_ROOT}" && gcloud builds submit --tag "${image}" .)
+    # v1 一律用 lab-0 的程式碼建置（之後的 Lab 程式碼已經是新版本）
+    local src
+    src=$(mktemp -d)
+    git -C "${REPO_ROOT}" fetch --tags --force --quiet || true
+    git -C "${REPO_ROOT}" archive lab-0 | tar -x -C "${src}"
+    (cd "${src}" && gcloud builds submit --tag "${image}" .)
+    rm -rf "${src}"
   fi
 
   step "Lab 0｜Firestore (default) 資料庫"
@@ -123,9 +130,86 @@ catchup_lab0() {
   fi
 }
 
+# 授予角色；服務帳戶剛建立時可能還沒生效，失敗就等一下再試
+grant_with_retry() {
+  local i
+  for i in 1 2 3 4 5 6; do
+    if "$@" --format=none 2>/dev/null; then return 0; fi
+    echo "授權失敗（服務帳戶可能還沒生效），10 秒後重試（第 ${i} 次）"
+    sleep 10
+  done
+  "$@" --format=none   # 最後一次，把錯誤訊息印出來
+}
+
+# ---------- Lab 1 的成果（Lab 2 以後都需要） ----------
+catchup_lab1() {
+  local sa_email="quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com"
+  local bucket="${PROJECT_ID}-gcp-ace-cxcxc"
+
+  step "Lab 1｜啟用 API"
+  gcloud services enable compute.googleapis.com iam.googleapis.com
+
+  step "Lab 1｜服務帳戶 quiz-helper"
+  if gcloud iam service-accounts describe "${sa_email}" >/dev/null 2>&1; then
+    skip
+  else
+    gcloud iam service-accounts create quiz-helper \
+      --display-name="quiz-helper" \
+      --description="考題小幫手"
+  fi
+
+  step "Lab 1｜自訂角色 quizHelperBucket（小幫手值區）"
+  local deleted
+  if deleted=$(gcloud iam roles describe quizHelperBucket --project="${PROJECT_ID}" --format="value(deleted)" 2>/dev/null); then
+    if [[ "${deleted}" == "True" ]]; then
+      echo "角色先前被刪除過，復原它"
+      gcloud iam roles undelete quizHelperBucket --project="${PROJECT_ID}" --format=none
+    else
+      skip
+    fi
+  else
+    gcloud iam roles create quizHelperBucket \
+      --project="${PROJECT_ID}" \
+      --file="${REPO_ROOT}/deploy/vm/quiz-helper-bucket-role.yaml" \
+      --format=none
+  fi
+
+  step "Lab 1｜授予服務帳戶角色（已授予的會直接通過）"
+  local role
+  for role in roles/datastore.user "projects/${PROJECT_ID}/roles/quizHelperBucket" roles/logging.logWriter; do
+    echo "${role}"
+    grant_with_retry gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+      --member="serviceAccount:${sa_email}" --role="${role}" --condition=None
+  done
+  echo "roles/artifactregistry.reader（quiz-helper 存放區）"
+  grant_with_retry gcloud artifacts repositories add-iam-policy-binding quiz-helper \
+    --location="${REGION}" --member="serviceAccount:${sa_email}" --role="roles/artifactregistry.reader"
+
+  step "Lab 1｜值區 ${bucket}（Lab 1 由小幫手自動建立，這裡直接建立）"
+  if gcloud storage buckets describe "gs://${bucket}" >/dev/null 2>&1; then
+    skip
+  else
+    gcloud storage buckets create "gs://${bucket}" \
+      --location="${REGION}" \
+      --default-storage-class=STANDARD \
+      --uniform-bucket-level-access
+  fi
+
+  step "Lab 1｜上傳範例題庫 questions.csv"
+  if gcloud storage objects describe "gs://${bucket}/questions.csv" >/dev/null 2>&1; then
+    skip
+  else
+    gcloud storage cp "${REPO_ROOT}/data/questions.csv" "gs://${bucket}/"
+  fi
+}
+
 if (( TARGET >= 1 )); then catchup_lab0; fi
+if (( TARGET >= 2 )); then catchup_lab1; fi
 
 echo
 echo "完成：Lab ${TARGET} 的起點已準備好。"
 echo "提醒：預算警示沒有自動建立，請依 labs/lab-0.md 步驟 6 設定。"
+if (( TARGET >= 2 )); then
+  echo "提醒：題庫 CSV 已在值區，但還沒匯入 Firestore；小幫手部署好後，請到管理頁面 /admin 按「匯入」（已經匯入過的可略過）。"
+fi
 echo "目前的專案是 ${PROJECT_ID}。請接著從 Lab ${TARGET} 的步驟 1 設定變數（export 那一段）開始。"

@@ -24,6 +24,7 @@ header { display: flex; justify-content: space-between; align-items: baseline; g
 h1 { font-size: 1.4rem; margin: 8px 0; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 12px 0; }
 .muted { color: var(--muted); font-size: 0.9rem; }
+.topic { display: inline-block; margin: 0; padding: 2px 10px; border-radius: 999px; background: #e8f0fe; color: var(--accent); font-size: 0.85rem; }
 .hidden { display: none; }
 
 input[type=text] { font-size: 1rem; padding: 8px; border: 1px solid var(--line); border-radius: 6px; width: 100%; max-width: 280px; }

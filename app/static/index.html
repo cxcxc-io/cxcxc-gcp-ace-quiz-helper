@@ -22,6 +22,7 @@
 
   <section id="quiz" class="card hidden">
     <p class="muted">暱稱：<span id="who"></span>（<button class="link" id="change-name">更換</button>）｜題號 <span id="qid"></span></p>
+    <p id="topic" class="topic hidden"></p>
     <p id="question-cn"></p>
     <p id="question-en" class="muted"></p>
     <p id="multi-hint" class="muted hidden"></p>
@@ -75,6 +76,13 @@ async function nextQuestion() {
   $("qid").textContent = current.question_id;
   $("question-cn").textContent = current.question_cn;
   $("question-en").textContent = current.question_en;
+
+  // v1.1 起：顯示題目的主題與相關服務（題庫沒填就不顯示）
+  const tags = [];
+  if (current.domain) tags.push(`主題：${current.domain}`);
+  if (current.services) tags.push(`相關服務：${current.services}`);
+  $("topic").textContent = tags.join("｜");
+  show("topic", tags.length > 0);
 
   // 單選題用圓形選項，複選題用方形核取方塊
   const multi = current.answer_count > 1;

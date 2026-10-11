@@ -5,7 +5,7 @@ import os
 
 import google.auth
 
-# 映像檔版本，用來在紀錄中對照流量分割（Dockerfile 預設為 v1）
+# 映像檔版本，用來在紀錄中對照流量分割（由 Dockerfile 設定）
 APP_VERSION = os.environ.get("APP_VERSION", "v1")
 
 # 值區建立在台灣（asia-east1）
