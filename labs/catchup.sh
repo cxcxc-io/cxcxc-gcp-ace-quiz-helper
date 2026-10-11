@@ -37,8 +37,12 @@ choose_project() {
     return
   fi
 
+  # 只列出使用中的專案；sys- 開頭的是 Apps Script 等服務自動建立的專案，不列出
   local projects=()
-  mapfile -t projects < <(gcloud projects list --format="value(projectId)" --sort-by=projectId)
+  mapfile -t projects < <(gcloud projects list \
+    --filter="lifecycleState=ACTIVE" \
+    --format="value(projectId)" \
+    --sort-by=projectId | grep -v '^sys-' || true)
   if (( ${#projects[@]} == 0 )); then
     echo "找不到任何專案，請確認登入的帳號，或先到 Console 建立專案。"
     exit 1
