@@ -36,6 +36,7 @@
 - 產品名稱用 Google 現行名稱（例如 Gemini Enterprise Agent Platform，必要時註明舊稱 Vertex AI）
 - 指令要能直接複製執行；用 shell 變數（例如 `PROJECT_ID`、`REGION`）取代需要學員手動替換的值
 - 取得程式碼：整門課只下載一次。每個 Lab 的步驟 1 用 `labs/lab-0.md` 步驟 1 方法 B 的那段指令（資料夾 `~/cloudshell_open/cxcxc-gcp-ace-quiz-helper` 已存在就切進去並 `git fetch --tags`，不存在才下載），只把 `git checkout` 換成該 Lab 的 tag
+- 每個 Lab 的步驟 1 設定變數前，先放 `gcloud config set project <你的專案 ID>`（唯一要學員手動替換的一行），換專案或新開 Cloud Shell 時才不會用錯專案
 - 「在 Cloud Shell 中開啟」一鍵按鈕：Lab 0 放在步驟 1；lab-1 之後只放在開頭「開始前」的「跟不上進度」區塊，註明「還沒下載過程式碼才按」，並附上同一個網址的純文字版；`cloudshell_git_branch` 用該 Lab 的 tag、`cloudshell_open_in_editor` 開該 Lab 的說明
 - 跟不上進度：不要叫學員回頭重做前面的 Lab。每個 Lab 的「開始前」提供 `bash labs/catchup.sh N`；做新的 lab-N 時，把「Lab N-1 的成果」加進 `labs/catchup.sh`（可重複執行、已存在就略過；預算警示不放進腳本）
 

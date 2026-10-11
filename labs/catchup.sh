@@ -30,6 +30,15 @@ skip() { echo "已存在，略過"; }
 
 echo "專案：${PROJECT_ID}｜區域：${REGION}｜目標：準備好 Lab ${TARGET} 的起點"
 
+# 先確認專案，避免在錯的專案建立資源（設定 CATCHUP_YES=1 可略過確認）
+if [[ "${CATCHUP_YES:-}" != "1" ]]; then
+  read -r -p "將在專案 ${PROJECT_ID} 建立資源，確認嗎？(y/N) " answer
+  if [[ ! "${answer}" =~ ^[Yy]$ ]]; then
+    echo "已取消。請先執行 gcloud config set project <你的專案 ID>，再重新執行這支腳本。"
+    exit 1
+  fi
+fi
+
 # ---------- Lab 0 的成果（Lab 1 以後都需要） ----------
 catchup_lab0() {
   step "Lab 0｜啟用 API"

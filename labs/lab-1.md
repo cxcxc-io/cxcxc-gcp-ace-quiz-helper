@@ -33,13 +33,13 @@
    https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-1&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-1.md
    ```
 
-2. 做完步驟 1（切換程式碼、設定變數）後，執行補進度腳本，自動建立 Lab 0 的成果（API、Artifact Registry 存放區、`quiz-helper:v1` 映像檔、Firestore 資料庫）：
+2. 做完步驟 1（切換程式碼、**設定專案**與變數）後，執行補進度腳本。腳本會先印出目前的專案，請確認是上課用的專案再輸入 `y`。它會自動建立 Lab 0 的成果（API、Artifact Registry 存放區、`quiz-helper:v1` 映像檔、Firestore 資料庫）：
 
    ```bash
    bash labs/catchup.sh 1
    ```
 
-   **預期看到的結果**：依序印出各項資源，已存在的顯示「已存在，略過」，最後出現「完成：Lab 1 的起點已準備好。」。第一次執行要建置映像檔，約需 2～3 分鐘；可以重複執行，不會重複建立。
+   **預期看到的結果**：先顯示「將在專案 <你的專案 ID> 建立資源，確認嗎？」，輸入 `y` 後依序印出各項資源，已存在的顯示「已存在，略過」，最後出現「完成：Lab 1 的起點已準備好。」。第一次執行要建置映像檔，約需 2～3 分鐘；可以重複執行，不會重複建立。
 
    > 腳本不會建立預算警示，請依 `labs/lab-0.md` 步驟 6 自行設定。
 
@@ -81,9 +81,10 @@ ls deploy/vm
 
 > 若 `git checkout` 顯示「Your local changes ... would be overwritten」，先執行 `git stash`，再重新執行 `git checkout lab-1`。
 
-設定這一段會用到的變數：
+確認 Cloud Shell 指向上課用的專案，再設定這一段會用到的變數：
 
 ```bash
+gcloud config set project <你的專案 ID>   # 只有這一行要自己換成專案 ID
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
 export ZONE=asia-east1-b
@@ -93,7 +94,9 @@ export BUCKET=${PROJECT_ID}-gcp-ace-cxcxc
 echo "專案：${PROJECT_ID}｜區域：${REGION}｜可用區：${ZONE}"
 ```
 
-**預期看到的結果**：印出你的專案 ID、`asia-east1`、`asia-east1-b`。
+**預期看到的結果**：印出你的專案 ID、`asia-east1`、`asia-east1-b`。若專案 ID 不對，重新執行 `gcloud config set project` 這一行。
+
+> 不知道專案 ID？執行 `gcloud projects list`，看 `PROJECT_ID` 欄位；或看 Console 上方的專案選擇器。
 
 > Cloud Shell 斷線重連後變數會消失，請重新執行這一段 `export`。
 
