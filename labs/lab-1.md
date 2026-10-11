@@ -21,9 +21,9 @@
 
 **已完成 Lab 0**：直接從步驟 1 開始。
 
-**跟不上進度、或換了新的專案**：依序做下面兩件事，就能從 Lab 1 的起點開始，不必回頭重做 Lab 0。
+**跟不上進度、或換了新的專案**：依序做下面三件事，就能從 Lab 1 的起點開始，不必回頭重做 Lab 0。
 
-1. **還沒下載過程式碼**才按這個按鈕（已經下載過的人不要按，重複按可能產生好幾個同名資料夾；請直接做步驟 1）。出現「信任此存放區（Trust repo）」選項時請勾選。
+1. **還沒下載過程式碼**才按這個按鈕（已經下載過的人不要按，重複按可能產生好幾個同名資料夾；請直接做第 2 點）。出現「信任此存放區（Trust repo）」選項時請勾選。
 
    [![在 Cloud Shell 中開啟](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-1&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-1.md)
 
@@ -33,13 +33,26 @@
    https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-1&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-1.md
    ```
 
-2. 做完步驟 1（切換程式碼、**設定專案**與變數）後，執行補進度腳本。腳本會先印出目前的專案，請確認是上課用的專案再輸入 `y`。它會自動建立 Lab 0 的成果（API、Artifact Registry 存放區、`quiz-helper:v1` 映像檔、Firestore 資料庫）：
+2. 執行補進度腳本。腳本會先列出你可以使用的專案，**輸入上課用專案的編號**（直接按 Enter 沿用目前的專案），自動切換過去後，建立 Lab 0 的成果（API、Artifact Registry 存放區、`quiz-helper:v1` 映像檔、Firestore 資料庫）：
 
    ```bash
+   cd ~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
+   git fetch --tags --force && git checkout lab-1
    bash labs/catchup.sh 1
    ```
 
-   **預期看到的結果**：先顯示「將在專案 <你的專案 ID> 建立資源，確認嗎？」，輸入 `y` 後依序印出各項資源，已存在的顯示「已存在，略過」，最後出現「完成：Lab 1 的起點已準備好。」。第一次執行要建置映像檔，約需 2～3 分鐘；可以重複執行，不會重複建立。
+   **預期看到的結果**：
+
+   ```
+   你可以使用的專案：
+     1) <專案 A>
+     2) <專案 B>   ← 目前的專案
+   請輸入編號（直接按 Enter 使用 <專案 B>）：
+   ```
+
+   輸入編號後，依序印出各項資源，已存在的顯示「已存在，略過」，最後出現「完成：Lab 1 的起點已準備好。」。第一次執行要建置映像檔，約需 2～3 分鐘；可以重複執行，不會重複建立。
+
+3. 接著做步驟 1：腳本已經幫你切換好專案，`gcloud config set project` 那一行可以略過，其餘照做。
 
    > 腳本不會建立預算警示，請依 `labs/lab-0.md` 步驟 6 自行設定。
 
