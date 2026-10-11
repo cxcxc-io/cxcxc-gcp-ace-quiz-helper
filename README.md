@@ -38,6 +38,7 @@ app/                應用程式碼
   static/           答題頁面與管理頁面
 Dockerfile
 data/questions.csv  範例題庫
+deploy/vm/          Lab 1：VM 開機指令碼、自訂角色「小幫手值區」定義
 labs/               每個階段的步驟說明
 tests/              單元測試
 ```

@@ -1,0 +1,22 @@
+# 自訂角色「小幫手值區」（quizHelperBucket）
+#
+# 小幫手只需要四個權限：
+#   storage.buckets.get     確認值區是否存在
+#   storage.buckets.create  值區不存在時自動建立
+#   storage.objects.list    管理頁面列出值區裡的 CSV
+#   storage.objects.get     讀取 CSV 內容
+#
+# 為什麼不用預先定義的角色：Storage Object Viewer 不能建立值區，Storage Admin 又給太多，
+# 剛好用來練習自訂角色與最小權限原則。
+#
+# 建立方式：
+#   gcloud iam roles create quizHelperBucket --project=${PROJECT_ID} \
+#     --file=deploy/vm/quiz-helper-bucket-role.yaml
+title: 小幫手值區
+description: 考題小幫手：查詢與建立值區、列出與讀取題庫 CSV
+stage: GA
+includedPermissions:
+  - storage.buckets.get
+  - storage.buckets.create
+  - storage.objects.list
+  - storage.objects.get
