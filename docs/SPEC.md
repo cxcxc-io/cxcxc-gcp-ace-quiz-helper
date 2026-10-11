@@ -171,7 +171,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 ### 應用身分需要的角色
 
-三個平台的身分來源不同（VM 服務帳戶、Workload Identity Federation for GKE、Cloud Run 服務身分），但需要的角色相同：
+三個平台的身分來源不同（VM 服務帳戶、Workload Identity Federation for GKE、Cloud Run 服務身分），但需要的角色相同。VM 與 Cloud Run 把角色授予 IAM 服務帳戶 `quiz-helper`；GKE 依官方建議做法，把角色**直接授予 Kubernetes 服務帳戶** `quiz-helper` 的主體（讓 Kubernetes 服務帳戶扮演 IAM 服務帳戶的舊做法，放在 Lab 2 最後當替代做法）：
 
 | 角色 | 用途 | 從哪個階段起 |
 | --- | --- | --- |
@@ -217,9 +217,9 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 ### 階段 2：GKE
 
-- 建立 Autopilot 叢集，用 Workload Identity Federation for GKE 讓 Pod 使用同一個服務帳戶
+- 建立 Autopilot 叢集，用 Workload Identity Federation for GKE 把角色直接授予 Kubernetes 服務帳戶，讓 Pod 取得同樣的權限（扮演 IAM 服務帳戶的做法放在最後當替代做法）
 - 部署 Deployment 與 Service，取得對外 IP
-- 設定 HorizontalPodAutoscaler，執行壓測腳本，看 Pod 自動增加
+- 用 `kubectl scale` 增加 Pod，刪掉一個 Pod 看它自動補回來（不做 HPA 與壓測：體感不明顯，也不容易穩定觸發）
 - 推出 v1.1（例如畫面顯示主題），觀察滾動更新不中斷服務
 - Logging：用 `jsonPayload.correct=false` 篩出答錯的紀錄；`resource.type` 變成 `k8s_container`
 - 痛點：沒人上課時叢集照樣計費
@@ -278,8 +278,8 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 | --- | --- | --- |
 | lab-0 | 應用程式碼、Dockerfile、範例題庫 CSV | 開始階段 1 前 |
 | lab-1 | 加上 VM 開機指令碼、自訂角色定義 | 開始階段 2 前 |
-| lab-2 | 加上 GKE 設定檔、v1.1 程式碼、壓測腳本 | 開始階段 3 前 |
-| lab-3 | 加上 Cloud Run 與 Eventarc 指令 | 開始階段 4 前 |
+| lab-2 | 加上 GKE 設定檔、v1.1 程式碼 | 開始階段 3 前 |
+| lab-3 | 加上 Cloud Run 與 Eventarc 指令、壓測腳本 | 開始階段 4 前 |
 | lab-4 | 加上問 AI 功能（v2） | 開始階段 5 前 |
 | lab-5 | 加上 LLM 監控的指標、資訊主頁與警示設定 | 開始階段 6 前 |
 | lab-6 | 加上接收器與清理指令，完整版 | 課後參考 |
@@ -295,7 +295,7 @@ app/                應用程式碼（答題、匯入、問 AI）
 Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          VM 開機指令碼
-deploy/gke/         Deployment、Service、HPA 設定檔
+deploy/gke/         Kubernetes 服務帳戶、Deployment、Service 設定檔
 deploy/cloudrun/    Cloud Run 與 Eventarc 指令
 loadtest/           壓測腳本
 labs/               每個階段的步驟說明與 gcloud 指令

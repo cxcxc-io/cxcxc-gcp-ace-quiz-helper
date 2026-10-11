@@ -3,15 +3,15 @@
 > 階段 2｜映像檔版本 `v1` → `v1.1`｜對應章節：GKE
 
 開課日湧入大量學員，一台 VM 撐不住，VM 停了服務也跟著中斷。這一段把同一個映像檔搬到 GKE Autopilot：
-同時跑好幾個 Pod、流量大時自動加 Pod（HorizontalPodAutoscaler），改版時用滾動更新（rolling update）一個一個換，服務不中斷。
+同時跑好幾個 Pod、一個指令就能加 Pod、Pod 掛了會自動補回來，改版時用滾動更新（rolling update）一個一個換，服務不中斷。
 
 ## 完成後你會有
 
 | 資源 | 名稱 | 在 Console 哪裡看 |
 | --- | --- | --- |
 | GKE Autopilot 叢集 | `quiz-helper-cluster` | Kubernetes Engine → 叢集 |
-| Kubernetes 服務帳戶 | `quiz-helper`（對應 IAM 服務帳戶 `quiz-helper`） | Kubernetes Engine → 叢集 → 點進叢集 → 資源 |
-| Deployment／Service／HPA | `quiz-helper` | Kubernetes Engine → 工作負載、Gateway、Service 與 Ingress |
+| Kubernetes 服務帳戶 | `quiz-helper`（直接被授予 Firestore 與值區的角色） | Kubernetes Engine → 叢集 → 點進叢集 → 資源 |
+| Deployment／Service | `quiz-helper` | Kubernetes Engine → 工作負載、Gateway、Service 與 Ingress |
 | 映像檔 | `quiz-helper:v1.1` | Artifact Registry → `quiz-helper` 存放區 |
 
 ## 開始前
@@ -56,8 +56,8 @@
 | GKE Autopilot | 依 Pod 要求的 CPU、記憶體與執行時間計費，另有叢集管理費（可能有免費額度可抵扣）；**這是本段主要費用** |
 | 外部負載平衡器 | Service 建立的負載平衡器依時間計費 |
 | Cloud Build | 建置 v1.1 一次，約 1～2 分鐘 |
-| Firestore | 壓測每次作答讀兩次；預設壓測約讀一萬多次，在每日免費額度內 |
-| Cloud Logging | 壓測會產生大量紀錄，仍在每月免費額度內 |
+| Firestore | 每次作答讀兩次，在每日免費額度內 |
+| Cloud Logging | 在每月免費額度內 |
 
 實際單價請查 [GKE 定價](https://cloud.google.com/kubernetes-engine/pricing)。**叢集開著就會計費，做完請依「清理」刪除叢集。**
 
@@ -75,10 +75,10 @@ else
   git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git "${REPO_DIR}" && cd "${REPO_DIR}"
 fi
 git checkout lab-2
-ls deploy/gke loadtest
+ls deploy/gke
 ```
 
-**預期看到的結果**：列出 `deployment.yaml`、`hpa.yaml`、`service.yaml`、`serviceaccount.yaml` 與 `run.py`。
+**預期看到的結果**：列出 `deployment.yaml`、`service.yaml`、`serviceaccount.yaml`。
 
 > 若 `git checkout` 顯示「Your local changes ... would be overwritten」，先執行 `git stash`，再重新執行 `git checkout lab-2`。
 
@@ -116,7 +116,7 @@ gcloud services enable container.googleapis.com
 
 Autopilot 叢集的節點（node）預設使用 Compute Engine 預設服務帳戶（`<專案編號>-compute@developer.gserviceaccount.com`）。節點要能從 Artifact Registry 拉映像檔、把紀錄與指標寫進 Cloud Logging／Cloud Monitoring。
 
-> 注意這裡有**兩種身分**：節點用 Compute Engine 預設服務帳戶「拉映像檔、送紀錄」；小幫手程式本身則在步驟 6 改用 `quiz-helper` 服務帳戶「讀寫 Firestore、Cloud Storage」。
+> 注意這裡有**兩種身分**：節點用 Compute Engine 預設服務帳戶「拉映像檔、送紀錄」；小幫手程式本身則在步驟 6 用 Kubernetes 服務帳戶 `quiz-helper` 的身分「讀寫 Firestore、Cloud Storage」。
 
 **Console**：
 
@@ -179,45 +179,67 @@ kubectl get namespaces
 
 > Autopilot 叢集在還沒有 Pod 時，`kubectl get nodes` 可能看不到任何節點，這是正常的；部署 Pod 後才會自動建立節點。
 
-## 步驟 6：用 Workload Identity Federation for GKE 讓 Pod 使用 quiz-helper 服務帳戶
+## 步驟 6：用 Workload Identity Federation for GKE 授予 Pod 權限
 
-Lab 1 的 VM 是「附加」服務帳戶；Pod 沒辦法這樣做，要用 Workload Identity Federation for GKE：
-建立一個 Kubernetes 服務帳戶（KSA）`quiz-helper`，允許它「扮演」IAM 服務帳戶 `quiz-helper`。這樣 Pod 拿到的身分和 Lab 1 的 VM 一樣，**一樣不需要任何金鑰**。
+Lab 1 的 VM 是「附加」服務帳戶來取得權限；Pod 沒辦法這樣做，要用 Workload Identity Federation for GKE：
+叢集裡的每個 Kubernetes 服務帳戶（KSA），在 IAM 裡都有一個對應的**主體（principal）**，可以像授權給使用者一樣，**直接把角色授予它**。Pod 用這個 Kubernetes 服務帳戶執行，就拿到這些角色，**一樣不需要任何金鑰**。
 
-1. 建立 Kubernetes 服務帳戶，並標註它對應的 IAM 服務帳戶（`deploy/gke/serviceaccount.yaml`）：
+1. 建立 Kubernetes 服務帳戶 `quiz-helper`（`deploy/gke/serviceaccount.yaml`）：
 
 ```bash
-sed "s|\${PROJECT_ID}|${PROJECT_ID}|g" deploy/gke/serviceaccount.yaml | kubectl apply -f -
-kubectl describe serviceaccount quiz-helper
+kubectl apply -f deploy/gke/serviceaccount.yaml
+kubectl get serviceaccount quiz-helper
 ```
 
-**預期看到的結果**：`serviceaccount/quiz-helper created`；`describe` 的 `Annotations` 有一行 `iam.gke.io/gcp-service-account: quiz-helper@<專案 ID>.iam.gserviceaccount.com`。
+**預期看到的結果**：`serviceaccount/quiz-helper created`；`get` 列出一筆 `quiz-helper`。
 
-2. 允許這個 Kubernetes 服務帳戶扮演 IAM 服務帳戶：授予它「Workload Identity 使用者（`roles/iam.workloadIdentityUser`）」角色，授予在 IAM 服務帳戶 `quiz-helper` 上。
+2. 組出這個 Kubernetes 服務帳戶在 IAM 裡的主體名稱：
 
-**Console**：導覽選單 →「IAM 與管理」→「服務帳戶」→ 點 `quiz-helper` →「主體存取權」（或「權限」）分頁 →「授予存取權」
+```bash
+export KSA_PRINCIPAL="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/default/sa/quiz-helper"
+echo ${KSA_PRINCIPAL}
+```
 
-- 新增主體：`<專案 ID>.svc.id.goog[default/quiz-helper]`
-- 角色：「Workload Identity 使用者」→「儲存」
+> 主體名稱的意思：專案 `${PROJECT_ID}` 的 GKE 身分集區（`<專案 ID>.svc.id.goog`）裡，`default` 命名空間（`ns/default`）的 `quiz-helper` Kubernetes 服務帳戶（`sa/quiz-helper`）。
+
+3. 直接授予它小幫手需要的兩個角色（和 Lab 1 授予服務帳戶 `quiz-helper` 的角色相同）：
+
+| 角色 | 用途 |
+| --- | --- |
+| Cloud Datastore 使用者（`roles/datastore.user`） | 讀寫 Firestore 題庫 |
+| 小幫手值區（`projects/<專案 ID>/roles/quizHelperBucket`） | 查詢與建立值區、讀取 CSV |
+
+> Lab 1 還授予了「記錄寫入者」與「Artifact Registry 讀取者」，在 GKE 上這兩件事由節點負責（步驟 3），Pod 不需要。
+
+**Console**：導覽選單 →「IAM 與管理」→「IAM」→「授予存取權」
+
+- 新增主體：貼上 `echo ${KSA_PRINCIPAL}` 印出的整串主體名稱
+- 角色：依序新增「Cloud Datastore 使用者」、「小幫手值區」（在「自訂」分類下）→「儲存」
 
 **gcloud**：
 
 ```bash
-gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="serviceAccount:${PROJECT_ID}.svc.id.goog[default/quiz-helper]" \
-  --format=none
+for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
+  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member="${KSA_PRINCIPAL}" \
+    --role="${ROLE}" \
+    --condition=None \
+    --format=none
+done
 ```
 
 **預期看到的結果**：
 
 ```bash
-gcloud iam service-accounts get-iam-policy ${SA_EMAIL}
+gcloud projects get-iam-policy ${PROJECT_ID} \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:sa/quiz-helper" \
+  --format="value(bindings.role)"
 ```
 
-看到 `role: roles/iam.workloadIdentityUser`，`members` 包含 `serviceAccount:<專案 ID>.svc.id.goog[default/quiz-helper]`。
+列出兩行：`roles/datastore.user`、`projects/<專案 ID>/roles/quizHelperBucket`。
 
-> 成員格式 `<專案 ID>.svc.id.goog[命名空間/KSA 名稱]` 代表「這個叢集所在專案裡，`default` 命名空間的 `quiz-helper` Kubernetes 服務帳戶」。
+> 比較 Lab 1：VM 是用 IAM 服務帳戶 `quiz-helper` 的身分；這裡 Pod 用的是 Kubernetes 服務帳戶 `quiz-helper` 自己的身分，角色直接授予它。另一種做法（讓 Kubernetes 服務帳戶「扮演」IAM 服務帳戶）見本頁最後的「替代做法」。
 
 ## 步驟 7：部署小幫手 v1
 
@@ -251,42 +273,47 @@ curl -s http://${LB_IP}/healthz
 
 3. 用手機打開 `http://<EXTERNAL-IP>` 答幾題。題目來自 Lab 1 已經匯入 Firestore 的題庫；**用補進度腳本的學員**，請先打開 `http://<EXTERNAL-IP>/admin` 按 `questions.csv` 的「匯入」。
 
-> 小幫手能讀到 Firestore、能列出值區，代表步驟 6 的 Workload Identity 設定成功：Pod 用的正是 `quiz-helper` 服務帳戶的權限。
+> 小幫手能讀到 Firestore、能列出值區，代表步驟 6 的 Workload Identity 設定成功：Pod 拿到的正是直接授予 Kubernetes 服務帳戶 `quiz-helper` 的角色。
+> 若出現權限錯誤：剛授予的角色可能要一兩分鐘才生效，等一下後執行 `kubectl rollout restart deployment/quiz-helper` 讓 Pod 重新啟動再試。
 
 **Console**：導覽選單 →「Kubernetes Engine」→「工作負載」，看到 `quiz-helper`，狀態「正常」，Pod 數 2/2。
 
-## 步驟 8：設定自動擴充，用壓測看 Pod 增加
+## 步驟 8：增加 Pod、刪掉 Pod，看 Kubernetes 怎麼處理
 
-1. 建立 HorizontalPodAutoscaler（`deploy/gke/hpa.yaml`）：所有 Pod 平均 CPU 使用率超過 50% 就增加 Pod，最少 2 個、最多 6 個。
-
-```bash
-kubectl apply -f deploy/gke/hpa.yaml
-kubectl get hpa quiz-helper
-```
-
-**預期看到的結果**：`horizontalpodautoscaler.autoscaling/quiz-helper created`；`TARGETS` 一開始可能是 `<unknown>/50%`，約一分鐘後變成 `cpu: 1%/50%` 之類的數字，`REPLICAS` 是 `2`。
-
-2. 在 Cloud Shell 開**第二個分頁**（終端機上方的「+」），觀察 HPA 與 Pod 數量：
+1. **一個指令就能加 Pod**：把 Pod 從 2 個增加到 4 個。
 
 ```bash
-kubectl get hpa quiz-helper --watch
+kubectl scale deployment quiz-helper --replicas=4
+kubectl get pods
 ```
 
-3. 回到第一個分頁執行壓測（30 位虛擬學員，持續 3 分鐘；**只呼叫答題，不呼叫問 AI**）：
+**預期看到的結果**：`deployment.apps/quiz-helper scaled`；`kubectl get pods` 多出兩個新的 Pod，狀態從 `Pending`、`ContainerCreating` 變成 `Running`（Autopilot 可能要先準備節點，需要一兩分鐘，重複執行 `kubectl get pods` 觀察）。
+
+**Console**：「Kubernetes Engine」→「工作負載」→ 點 `quiz-helper`，「代管 Pod」區塊也會看到 4 個 Pod。
+
+2. **Pod 掛了會自己補回來**：在 Cloud Shell 開**第二個分頁**（終端機上方的「+」），持續觀察 Pod：
 
 ```bash
-python3 loadtest/run.py http://${LB_IP} --users 30 --duration 180
+kubectl get pods --watch
 ```
 
-**預期看到的結果**：
+回到第一個分頁，隨便刪掉一個 Pod（模擬它當機）：
 
-- 第一個分頁每 10 秒印一次「完成作答 N 次」，失敗次數接近 0
-- 第二個分頁的 `TARGETS` CPU 百分比上升超過 50% 後，`REPLICAS` 從 2 逐步增加（例如 3、4…）
-- `kubectl get pods` 可以看到新的 Pod 從 `Pending`、`ContainerCreating` 變成 `Running`
+```bash
+kubectl delete pod $(kubectl get pods -l app=quiz-helper -o jsonpath='{.items[0].metadata.name}')
+```
 
-> CPU 一直沒超過 50%、Pod 沒有增加：加大壓測，例如 `--users 60 --think 0.2`。
+**預期看到的結果**：第二個分頁看到被刪的 Pod 變成 `Terminating`，同時馬上出現一個新的 Pod，從 `Pending` 變成 `Running`。Deployment 會一直維持你指定的 4 個 Pod。這段期間用手機重新整理小幫手，照樣可以答題。
 
-壓測結束後，HPA 大約 5 分鐘後才會慢慢把 Pod 縮回 2 個（避免流量一來一回就頻繁增減）。第二個分頁按 Ctrl+C 停止觀察。
+> 這就是 Lab 1 VM 做不到的事：VM 停了服務就中斷；Deployment 裡的 Pod 掛了，Kubernetes 會自動補一個新的，其他 Pod 繼續服務。
+
+3. 縮回 2 個 Pod，第二個分頁按 Ctrl+C 停止觀察：
+
+```bash
+kubectl scale deployment quiz-helper --replicas=2
+```
+
+**預期看到的結果**：多出來的兩個 Pod 變成 `Terminating` 後消失，剩下 2 個 `Running`。
 
 ## 步驟 9：推出 v1.1，觀察滾動更新不中斷服務
 
@@ -328,97 +355,90 @@ kubectl rollout status deployment/quiz-helper
 
 GKE 會把容器標準輸出的 JSON 解析成 `jsonPayload`。紀錄的 `resource.type` 從 Lab 1 的 `gce_instance` 變成 `k8s_container`。
 
-**Console**：導覽選單 →「Logging」→「Logs Explorer」，貼上這段查詢，找出**真人**答錯的紀錄（排除壓測的虛擬學員）：
+**Console**：導覽選單 →「Logging」→「Logs Explorer」，貼上這段查詢，找出答錯的紀錄：
 
 ```
 resource.type="k8s_container"
 resource.labels.container_name="quiz-helper"
 jsonPayload.event="answer"
 jsonPayload.correct=false
-NOT jsonPayload.nickname:"loadtest-"
 ```
 
-**預期看到的結果**：只列出你自己（和其他真人）答錯的紀錄；展開後 `resource.labels` 有 `cluster_name: quiz-helper-cluster`、`pod_name` 等欄位。
+**預期看到的結果**：只列出答錯的紀錄；展開後 `resource.labels` 有 `cluster_name: quiz-helper-cluster`、`pod_name` 等欄位。
 
 **gcloud**：
 
 ```bash
 gcloud logging read \
-  'resource.type="k8s_container" AND jsonPayload.event="answer" AND jsonPayload.correct=false AND NOT jsonPayload.nickname:"loadtest-"' \
+  'resource.type="k8s_container" AND jsonPayload.event="answer" AND jsonPayload.correct=false' \
   --limit=5 \
   --format="table(timestamp, jsonPayload.nickname, jsonPayload.question_id, jsonPayload.app_version, resource.labels.pod_name)"
 ```
 
-**預期看到的結果**：一個表格，列出最近 5 筆真人答錯的紀錄，以及是哪個 Pod 處理的。
+**預期看到的結果**：一個表格，列出最近 5 筆答錯的紀錄，以及是哪個 Pod 處理的。
 
 試試看：
 
 - 改成 `jsonPayload.app_version="v1.1"`，只看更新後的紀錄
-- 改成 `jsonPayload.nickname:"loadtest-"`，看壓測產生了多少紀錄
+- 加上 `jsonPayload.nickname="你的暱稱"`，只看自己的紀錄
 - 比較 Lab 1：同樣的 `jsonPayload` 欄位，只是 `resource.type` 不同
 
 ## 想一想：這樣還有什麼問題？
 
-- **沒人上課時叢集照樣計費**：HPA 最少保留 2 個 Pod，負載平衡器也一直開著；上課時段以外沒有流量，錢照付
+- **沒人上課時叢集照樣計費**：Deployment 一直保留 2 個 Pod，負載平衡器也一直開著；上課時段以外沒有流量，錢照付
 - **還是要管叢集**：雖然 Autopilot 幫你管節點，但叢集、Kubernetes 設定檔、Workload Identity 都還是要自己處理
+- **Pod 數量要自己調**：上課人多時要記得 `kubectl scale`（Kubernetes 也能依 CPU 自動增減 Pod，稱為 HorizontalPodAutoscaler，本課程不實作）
 
 Lab 3 會把同一個 v1.1 映像檔部署到 Cloud Run：沒有流量時縮到零，不用管叢集。
 
-## 延伸（選做）：另一種讓 Pod 取得權限的做法
+## 替代做法（選做）：讓 Kubernetes 服務帳戶「扮演」IAM 服務帳戶
 
-步驟 6 用的是「Kubernetes 服務帳戶**扮演** IAM 服務帳戶」：權限授予在 IAM 服務帳戶 `quiz-helper` 上，VM、GKE、Cloud Run 共用同一個身分與同一組角色。
+步驟 6 把角色**直接授予 Kubernetes 服務帳戶**，這是 Google 官方文件目前的建議做法。
+Workload Identity Federation for GKE 還有另一種較早的做法：讓 Kubernetes 服務帳戶**扮演** IAM 服務帳戶 `quiz-helper`，Pod 就拿到 Lab 1 授予 `quiz-helper` 的所有角色。少數 Google Cloud API 不支援直接授權時，就要用這種做法。
 
-Workload Identity Federation for GKE 還有另一種做法：**不經過 IAM 服務帳戶，直接把角色授予 Kubernetes 服務帳戶**。Google 官方文件目前把這種做法列為建議做法；扮演的做法則保留給有限制的 API 使用。
-
-| | 步驟 6 的做法（扮演） | 直接授權 |
+| | 步驟 6：直接授權 | 替代做法：扮演 IAM 服務帳戶 |
 | --- | --- | --- |
-| Kubernetes 服務帳戶 | 要加標註，指向 IAM 服務帳戶 | 不用標註 |
-| 授權 | 一次：允許扮演（`roles/iam.workloadIdentityUser`） | 每個需要的角色都直接授予 Kubernetes 服務帳戶 |
-| 權限放在哪 | IAM 服務帳戶上，VM、Cloud Run 共用 | Kubernetes 服務帳戶上，只有 GKE 用得到 |
+| Kubernetes 服務帳戶 | 不用標註 | 要加標註，指向 IAM 服務帳戶 |
+| 授權 | 每個需要的角色都直接授予 Kubernetes 服務帳戶 | 一次：允許扮演（`roles/iam.workloadIdentityUser`） |
+| 權限放在哪 | Kubernetes 服務帳戶上，只有 GKE 用得到 | IAM 服務帳戶上，和 VM、Cloud Run 共用同一組角色 |
 
-想試試看的話，建立一個沒有標註的 Kubernetes 服務帳戶 `quiz-helper-direct`，直接授予它小幫手需要的兩個角色，再把 Deployment 換成用它：
-
-```bash
-# 1. 建立 Kubernetes 服務帳戶（沒有標註）
-kubectl create serviceaccount quiz-helper-direct
-
-# 2. 這個 Kubernetes 服務帳戶在 IAM 裡的主體名稱
-export KSA_PRINCIPAL="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/default/sa/quiz-helper-direct"
-
-# 3. 直接授予角色：讀寫 Firestore、小幫手值區
-for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
-  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-    --member="${KSA_PRINCIPAL}" --role="${ROLE}" --condition=None --format=none
-done
-
-# 4. 讓 Deployment 改用這個 Kubernetes 服務帳戶（會觸發一次滾動更新）
-kubectl set serviceaccount deployment quiz-helper quiz-helper-direct
-kubectl rollout status deployment/quiz-helper
-```
-
-**預期看到的結果**：`deployment "quiz-helper" successfully rolled out`；手機重新整理小幫手，照樣能答題、管理頁面照樣列得出值區裡的 CSV。這次 Pod 拿到的權限，來自直接授予 `quiz-helper-direct` 的角色，完全沒有經過 IAM 服務帳戶 `quiz-helper`。
-
-> 剛授予的角色可能要一兩分鐘才生效。若答題時出現錯誤，等一下再試，或執行 `kubectl rollout restart deployment/quiz-helper` 讓 Pod 重新啟動。
-
-試完要改回步驟 6 的做法：
+想試試看的話，先拿掉步驟 6 直接授予的角色（才能確定權限是從扮演來的），再改成扮演：
 
 ```bash
-kubectl set serviceaccount deployment quiz-helper quiz-helper
+# 1. 拿掉直接授予 Kubernetes 服務帳戶的角色
 for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
   gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
     --member="${KSA_PRINCIPAL}" --role="${ROLE}" --condition=None --format=none
 done
-kubectl delete serviceaccount quiz-helper-direct
+
+# 2. 在 Kubernetes 服務帳戶加上標註：它要扮演哪一個 IAM 服務帳戶
+kubectl annotate serviceaccount quiz-helper \
+  iam.gke.io/gcp-service-account=${SA_EMAIL} --overwrite
+
+# 3. 允許它扮演：在 IAM 服務帳戶 quiz-helper 上授予「Workload Identity 使用者」
+gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:${PROJECT_ID}.svc.id.goog[default/quiz-helper]" \
+  --format=none
+
+# 4. 重新啟動 Pod，讓新的身分設定生效
+kubectl rollout restart deployment/quiz-helper
+kubectl rollout status deployment/quiz-helper
 ```
+
+**預期看到的結果**：`deployment "quiz-helper" successfully rolled out`；手機重新整理小幫手，照樣能答題、管理頁面照樣列得出值區裡的 CSV。這次 Pod 的權限來自 IAM 服務帳戶 `quiz-helper`（Lab 1 授予的角色），不是直接授予 Kubernetes 服務帳戶的角色。
+
+> 剛授予的角色可能要一兩分鐘才生效。若答題時出現錯誤，等一下再執行一次 `kubectl rollout restart deployment/quiz-helper`。
+> 試完不需要改回：Lab 2 結束會刪除整個叢集。「課程全部結束時」的清理指令會把兩種做法的授權都移除。
 
 ---
 
 ## 本段檢查清單
 
 - [ ] Autopilot 叢集 `quiz-helper-cluster` 建立完成
-- [ ] Pod 透過 Workload Identity 使用 `quiz-helper` 服務帳戶，能讀 Firestore、列出值區
+- [ ] Kubernetes 服務帳戶 `quiz-helper` 直接被授予兩個角色，Pod 能讀 Firestore、列出值區
 - [ ] 手機打得開 `http://<EXTERNAL-IP>`
-- [ ] 壓測時 HPA 把 Pod 從 2 個增加
+- [ ] `kubectl scale` 把 Pod 增加到 4 個；刪掉一個 Pod 後自動補回來
 - [ ] 換成 v1.1 時服務沒有中斷，畫面出現主題標籤
 - [ ] Logs Explorer 用 `resource.type="k8s_container"` 與 `jsonPayload.correct=false` 篩出答錯的紀錄
 
@@ -455,7 +475,15 @@ export REGION=asia-east1
 export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
 export NODE_SA=${PROJECT_NUMBER}-compute@developer.gserviceaccount.com
 
-# 移除 Workload Identity 授權
+# 移除直接授予 Kubernetes 服務帳戶的角色（步驟 6）
+export KSA_PRINCIPAL="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/default/sa/quiz-helper"
+for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
+  gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
+    --member="${KSA_PRINCIPAL}" --role="${ROLE}" --condition=None --format=none
+done
+
+# 移除扮演的授權（只有做過「替代做法」才需要）
+# 上面或下面的授權若本來就不存在，會顯示找不到的錯誤，可以忽略
 gcloud iam service-accounts remove-iam-policy-binding ${SA_EMAIL} \
   --role="roles/iam.workloadIdentityUser" \
   --member="serviceAccount:${PROJECT_ID}.svc.id.goog[default/quiz-helper]" --format=none
