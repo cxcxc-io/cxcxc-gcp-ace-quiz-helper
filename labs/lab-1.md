@@ -218,6 +218,12 @@ gcloud artifacts repositories add-iam-policy-binding quiz-helper \
   --format=none
 ```
 
+> **出現 `Service account quiz-helper@... does not exist`？**
+> 先確認服務帳戶在不在：`gcloud iam service-accounts list --filter="email:quiz-helper@"`
+> - 有列出來：服務帳戶剛建立，還沒在整個系統生效（通常幾十秒到一分鐘）。等一分鐘後，重新執行上面這段授權指令。
+> - 沒有列出來：回到步驟 3 建立服務帳戶。
+> - 若 Cloud Shell 曾斷線，也請確認 `echo ${SA_EMAIL}` 有印出 `quiz-helper@<專案 ID>.iam.gserviceaccount.com`；空白的話重新執行步驟 1 的 `export`。
+
 **預期看到的結果**：
 
 ```bash
