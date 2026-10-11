@@ -364,6 +364,53 @@ gcloud logging read \
 
 Lab 3 會把同一個 v1.1 映像檔部署到 Cloud Run：沒有流量時縮到零，不用管叢集。
 
+## 延伸（選做）：另一種讓 Pod 取得權限的做法
+
+步驟 6 用的是「Kubernetes 服務帳戶**扮演** IAM 服務帳戶」：權限授予在 IAM 服務帳戶 `quiz-helper` 上，VM、GKE、Cloud Run 共用同一個身分與同一組角色。
+
+Workload Identity Federation for GKE 還有另一種做法：**不經過 IAM 服務帳戶，直接把角色授予 Kubernetes 服務帳戶**。Google 官方文件目前把這種做法列為建議做法；扮演的做法則保留給有限制的 API 使用。
+
+| | 步驟 6 的做法（扮演） | 直接授權 |
+| --- | --- | --- |
+| Kubernetes 服務帳戶 | 要加標註，指向 IAM 服務帳戶 | 不用標註 |
+| 授權 | 一次：允許扮演（`roles/iam.workloadIdentityUser`） | 每個需要的角色都直接授予 Kubernetes 服務帳戶 |
+| 權限放在哪 | IAM 服務帳戶上，VM、Cloud Run 共用 | Kubernetes 服務帳戶上，只有 GKE 用得到 |
+
+想試試看的話，建立一個沒有標註的 Kubernetes 服務帳戶 `quiz-helper-direct`，直接授予它小幫手需要的兩個角色，再把 Deployment 換成用它：
+
+```bash
+# 1. 建立 Kubernetes 服務帳戶（沒有標註）
+kubectl create serviceaccount quiz-helper-direct
+
+# 2. 這個 Kubernetes 服務帳戶在 IAM 裡的主體名稱
+export KSA_PRINCIPAL="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/${PROJECT_ID}.svc.id.goog/subject/ns/default/sa/quiz-helper-direct"
+
+# 3. 直接授予角色：讀寫 Firestore、小幫手值區
+for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
+  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member="${KSA_PRINCIPAL}" --role="${ROLE}" --condition=None --format=none
+done
+
+# 4. 讓 Deployment 改用這個 Kubernetes 服務帳戶（會觸發一次滾動更新）
+kubectl set serviceaccount deployment quiz-helper quiz-helper-direct
+kubectl rollout status deployment/quiz-helper
+```
+
+**預期看到的結果**：`deployment "quiz-helper" successfully rolled out`；手機重新整理小幫手，照樣能答題、管理頁面照樣列得出值區裡的 CSV。這次 Pod 拿到的權限，來自直接授予 `quiz-helper-direct` 的角色，完全沒有經過 IAM 服務帳戶 `quiz-helper`。
+
+> 剛授予的角色可能要一兩分鐘才生效。若答題時出現錯誤，等一下再試，或執行 `kubectl rollout restart deployment/quiz-helper` 讓 Pod 重新啟動。
+
+試完要改回步驟 6 的做法：
+
+```bash
+kubectl set serviceaccount deployment quiz-helper quiz-helper
+for ROLE in roles/datastore.user projects/${PROJECT_ID}/roles/quizHelperBucket; do
+  gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
+    --member="${KSA_PRINCIPAL}" --role="${ROLE}" --condition=None --format=none
+done
+kubectl delete serviceaccount quiz-helper-direct
+```
+
 ---
 
 ## 本段檢查清單
