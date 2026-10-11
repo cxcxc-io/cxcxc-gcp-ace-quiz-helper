@@ -39,7 +39,7 @@ app/                應用程式碼
 Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          Lab 1：VM 開機指令碼、自訂角色「小幫手值區」定義
-labs/               每個階段的步驟說明
+labs/               每個階段的步驟說明；catchup.sh 是跟不上進度時用的補進度腳本
 tests/              單元測試
 ```
 

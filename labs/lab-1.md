@@ -19,8 +19,29 @@
 
 ## 開始前
 
-- 已完成 Lab 0：Artifact Registry 裡有 `quiz-helper:v1`，Firestore 有 `(default)` 資料庫
-- 跟不上 Lab 0 的學員：請先回去完成 Lab 0 的步驟 2～5
+**已完成 Lab 0**：直接從步驟 1 開始。
+
+**跟不上進度、或換了新的專案**：依序做下面兩件事，就能從 Lab 1 的起點開始，不必回頭重做 Lab 0。
+
+1. **還沒下載過程式碼**才按這個按鈕（已經下載過的人不要按，重複按可能產生好幾個同名資料夾；請直接做步驟 1）。出現「信任此存放區（Trust repo）」選項時請勾選。
+
+   [![在 Cloud Shell 中開啟](https://gstatic.com/cloudssh/images/open-btn.svg)](https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-1&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-1.md)
+
+   按鈕無法使用時，複製這個網址到瀏覽器打開：
+
+   ```
+   https://shell.cloud.google.com/cloudshell/editor?cloudshell_git_repo=https%3A%2F%2Fgithub.com%2Fcxcxc-io%2Fcxcxc-gcp-ace-quiz-helper.git&cloudshell_git_branch=lab-1&cloudshell_workspace=.&cloudshell_open_in_editor=labs%2Flab-1.md
+   ```
+
+2. 做完步驟 1（切換程式碼、設定變數）後，執行補進度腳本，自動建立 Lab 0 的成果（API、Artifact Registry 存放區、`quiz-helper:v1` 映像檔、Firestore 資料庫）：
+
+   ```bash
+   bash labs/catchup.sh 1
+   ```
+
+   **預期看到的結果**：依序印出各項資源，已存在的顯示「已存在，略過」，最後出現「完成：Lab 1 的起點已準備好。」。第一次執行要建置映像檔，約需 2～3 分鐘；可以重複執行，不會重複建立。
+
+   > 腳本不會建立預算警示，請依 `labs/lab-0.md` 步驟 6 自行設定。
 
 ## 需要的角色
 
@@ -43,7 +64,7 @@
 
 ## 步驟 1：切換到 Lab 1 的程式碼，設定變數
 
-Lab 0 已經下載過程式碼，這裡**不要再按一鍵按鈕**，在 Cloud Shell 終端機執行下面這段（資料夾已存在就切進去，不存在才下載）：
+程式碼已經下載過（Lab 0 或上方「開始前」的按鈕），這裡**不要再按一鍵按鈕**，在 Cloud Shell 終端機執行下面這段（資料夾已存在就切進去，不存在才下載）：
 
 ```bash
 REPO_DIR=~/cloudshell_open/cxcxc-gcp-ace-quiz-helper
