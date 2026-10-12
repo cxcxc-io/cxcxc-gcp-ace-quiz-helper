@@ -8,7 +8,8 @@
 
 1. **一次只做一個 tag。** 只做使用者指定的 lab-N 範圍（見 SPEC 第 4、5 節），不要提前做下一個 tag 的內容，也不要「順便」重構其他階段。
 2. **做完就停下來。** 改動直接進 `main`、打上 tag 後回報（回報內容依下方「回報格式」），等使用者實測。不要自行接著做下一個 tag。
-3. **改動直接進 `main`，由你打 tag，使用者對 tag 實測。** 課程尚未開放，開發不另開功能分支、不等使用者審 PR：改完就進 `main`，在 `main` 最新的 commit 打 `lab-N`；實測發現問題時，修正同樣直接進 `main`，再把同一個 tag 移到 `main` 最新的 commit。打 tag 與移動 tag 一律觸發 GitHub Actions 工作流程「打上或移動 lab tag」（`.github/workflows/lab-tag.yml`，輸入 `lab-N`），因為這個開發環境不能直接推送 tag。tag 只打在 `main` 上；實測通過前不要開始下一個 tag。
+3. **改動直接進 `main`，由你打 tag，使用者對 tag 實測。** 課程尚未開放，開發不另開功能分支、不等使用者審 PR：改完就進 `main`，在 `main` 最新的 commit 打 `lab-N`；實測發現問題時，修正同樣直接進 `main`，再把同一個 tag 移到 `main` 最新的 commit。打 tag 與移動 tag 一律觸發 GitHub Actions 工作流程「打上或移動 lab tag」（`.github/workflows/lab-tag.yml`，輸入 `lab-N`），因為這個開發環境不能直接推送 tag。實測通過前不要開始下一個 tag。
+   - **修正舊 Lab**：`main` 已經有後面 Lab 的內容時，不要把舊 tag 移到 `main`（快照會混進後面 Lab 的檔案）。修正一樣先進 `main`；再從舊 tag 拉出一個 commit，只套用該 Lab 的修正，暫時推到工作分支讓 GitHub 拿得到，觸發工作流程時「打在哪裡」填這個 commit 的 40 碼編號，tag 移好後工作分支再回到 `main`
 4. **不要碰任何 GCP 憑證。** 不要要求、建立或提交服務帳戶金鑰、API 金鑰、`.env` 憑證。程式一律使用平台提供的身分（Application Default Credentials）。
 5. **你無法存取 GCP 專案。** 不要宣稱已經部署或驗證過任何雲端步驟；雲端行為一律寫成「請人工實測」。
 6. **不確定就標出來，不要猜。** 涉及目前狀態的事（角色名稱、指令參數、預設值、Console 選單位置、模型名稱、價格），能查官方文件就查；查不到就在 PR 說明的「待確認」列出。SPEC 第 7 節已列的待查證事項，碰到時要特別處理。
@@ -57,6 +58,6 @@
 
 ## 版本命名
 
-- git tag：`lab-0`～`lab-6`（PR 合併後打在 `main` 上，實測通過前可移動）
+- git tag：`lab-0`～`lab-6`（一般打在 `main` 上；修正舊 Lab 時打在只含該 Lab 修正的 commit 上；實測通過前可移動）
 - 容器映像檔標記：`v1`、`v1.1`、`v2`
 - 兩者刻意分開命名，不要混用

@@ -1,7 +1,10 @@
-# 在 main 最新的 commit 打上（或移動）lab-N tag。
+# 打上（或移動）lab-N tag。
 # 給課程維護者用，學員不需要理會這個檔案。
 # 用法：GitHub →「Actions」→「打上或移動 lab tag」→「Run workflow」，輸入 lab-0～lab-6。
-# tag 已經存在時會移到 main 最新的 commit（實測修正後使用）。
+# - 「打在哪裡」不填：打在 main 最新的 commit（一般情況）
+# - 「打在哪裡」填 commit 編號（40 碼）：修正舊 Lab 時使用。main 已經有後面 Lab 的內容，
+#   就從舊 tag 拉出一個只含該 Lab 修正的 commit，把 tag 移過去
+# tag 已經存在時會移到新的位置（實測修正後使用）。
 name: 打上或移動 lab tag
 
 on:
@@ -10,6 +13,10 @@ on:
       tag:
         description: "要打的 tag（lab-0～lab-6）"
         required: true
+      ref:
+        description: "打在哪裡：不填就是 main 最新的 commit；修正舊 Lab 時填 40 碼的 commit 編號"
+        required: false
+        default: "main"
 
 permissions:
   contents: write
@@ -21,6 +28,7 @@ jobs:
       - name: 打上 tag 並推送
         env:
           TAG: ${{ inputs.tag }}
+          REF: ${{ inputs.ref }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: |
@@ -29,10 +37,15 @@ jobs:
             echo "tag 必須是 lab-0～lab-6，收到：${TAG}"
             exit 1
           fi
+          REF="${REF:-main}"
+          if [[ "${REF}" != "main" && ! "${REF}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "打在哪裡只能是 main 或 40 碼的 commit 編號，收到：${REF}"
+            exit 1
+          fi
           git init -q .
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          git fetch -q --depth=1 origin main
+          git fetch -q --depth=1 origin "${REF}"
           echo "舊位置：$(git ls-remote --tags origin "refs/tags/${TAG}" | cut -f1)"
           git tag -f "${TAG}" FETCH_HEAD
           git push -f origin "refs/tags/${TAG}"
-          echo "新位置：$(git rev-parse FETCH_HEAD)（main 最新的 commit）"
+          echo "新位置：$(git rev-parse FETCH_HEAD)（${REF}）"
