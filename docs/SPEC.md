@@ -229,7 +229,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 - 同一個 v1.1 映像檔部署成 Cloud Run 服務，指定服務身分，開放未驗證存取
 - 建立 Eventarc 觸發條件：值區有新 CSV 時，自動呼叫小幫手的匯入端點
-- 執行壓測腳本看執行個體增加，停止後看縮到零
+- 用 `/healthz` 回報的執行個體 ID 觀察擴充：同時送一批請求，把並行數（concurrency）改成 1 後看到執行個體變多；閒置後看縮到零與冷啟動（不使用壓測腳本）
 - Logging：把「答錯次數」做成紀錄型指標，設一個警示政策；`resource.type` 變成 `cloud_run_revision`
 - 對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
 
@@ -279,7 +279,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 | lab-0 | 應用程式碼、Dockerfile、範例題庫 CSV | 開始階段 1 前 |
 | lab-1 | 加上 VM 開機指令碼、自訂角色定義 | 開始階段 2 前 |
 | lab-2 | 加上 GKE 設定檔、v1.1 程式碼 | 開始階段 3 前 |
-| lab-3 | 加上 Cloud Run 與 Eventarc 指令、壓測腳本 | 開始階段 4 前 |
+| lab-3 | 加上 Cloud Run 與 Eventarc 指令、警示政策範本、第二份範例題庫 | 開始階段 4 前 |
 | lab-4 | 加上問 AI 功能（v2） | 開始階段 5 前 |
 | lab-5 | 加上 LLM 監控的指標、資訊主頁與警示設定 | 開始階段 6 前 |
 | lab-6 | 加上接收器與清理指令，完整版 | 課後參考 |
@@ -296,8 +296,7 @@ Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          VM 開機指令碼
 deploy/gke/         Kubernetes 服務帳戶、Deployment、Service 設定檔
-deploy/cloudrun/    Cloud Run 與 Eventarc 指令
-loadtest/           壓測腳本
+deploy/cloudrun/    Cloud Run 相關設定（警示政策範本）；部署與 Eventarc 指令寫在 labs/lab-3.md
 labs/               每個階段的步驟說明與 gcloud 指令
 ```
 
@@ -332,9 +331,8 @@ labs/               每個階段的步驟說明與 gcloud 指令
 
 ### 壓測腳本
 
-- 用途只有一個：讓學員看到擴充與縮到零，不用來產生分析資料
-- 模擬多位虛擬學員連續呼叫答題 API，可設定人數與持續時間
-- 只呼叫答題，**不呼叫問 AI**，避免全班一跑就產生大量 Gemini 費用（階段 5 另有小量的問 AI 壓測）
+- 階段 2、3 不使用壓測腳本：擴充的體感不明顯，也不容易穩定觸發。改用畫面與 `/healthz` 顯示的執行個體名稱，搭配 `kubectl scale`、刪除 Pod、Cloud Run 並行數設定，讓變化看得見
+- 階段 5 另有小量的問 AI 壓測（例如全班各問 10 次），讓 LLM 指標有資料
 
 ### 費用控管
 

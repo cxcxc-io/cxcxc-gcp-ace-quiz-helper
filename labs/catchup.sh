@@ -4,6 +4,7 @@
 # 用法（在程式碼資料夾裡執行）：
 #   bash labs/catchup.sh 1     # 準備好 Lab 1 的起點（Lab 0 的成果）
 #   bash labs/catchup.sh 2     # 準備好 Lab 2 的起點（Lab 0、Lab 1 的成果）
+#   bash labs/catchup.sh 3     # 準備好 Lab 3 的起點（Lab 0～2 的成果）
 #
 # - 只給跟不上進度的學員用；照 Lab 一步步做的學員不需要執行
 # - 一開始會列出你的專案讓你選，選好後自動切換（gcloud config set project）
@@ -90,6 +91,23 @@ fi
 echo
 echo "專案：${PROJECT_ID}｜區域：${REGION}｜目標：準備好 Lab ${TARGET} 的起點"
 
+# 用某個 Lab 的程式碼建置映像檔（已存在就略過）。
+# 例如 v1 一律用 lab-0 的程式碼、v1.1 一律用 lab-2 的程式碼，版本號才會正確。
+build_image() {
+  local version="$1" tag="$2"
+  local image="${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:${version}"
+  if gcloud artifacts docker images describe "${image}" >/dev/null 2>&1; then
+    skip
+    return
+  fi
+  local src
+  src=$(mktemp -d)
+  git -C "${REPO_ROOT}" fetch --tags --force --quiet || true
+  git -C "${REPO_ROOT}" archive "${tag}" | tar -x -C "${src}"
+  (cd "${src}" && gcloud builds submit --tag "${image}" .)
+  rm -rf "${src}"
+}
+
 # ---------- Lab 0 的成果（Lab 1 以後都需要） ----------
 catchup_lab0() {
   step "Lab 0｜啟用 API"
@@ -109,18 +127,7 @@ catchup_lab0() {
   fi
 
   step "Lab 0｜用 Cloud Build 建置映像檔 quiz-helper:v1（約 1～2 分鐘）"
-  local image="${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1"
-  if gcloud artifacts docker images describe "${image}" >/dev/null 2>&1; then
-    skip
-  else
-    # v1 一律用 lab-0 的程式碼建置（之後的 Lab 程式碼已經是新版本）
-    local src
-    src=$(mktemp -d)
-    git -C "${REPO_ROOT}" fetch --tags --force --quiet || true
-    git -C "${REPO_ROOT}" archive lab-0 | tar -x -C "${src}"
-    (cd "${src}" && gcloud builds submit --tag "${image}" .)
-    rm -rf "${src}"
-  fi
+  build_image v1 lab-0
 
   step "Lab 0｜Firestore (default) 資料庫"
   if gcloud firestore databases describe --database="(default)" >/dev/null 2>&1; then
@@ -203,8 +210,16 @@ catchup_lab1() {
   fi
 }
 
+# ---------- Lab 2 的成果（Lab 3 以後都需要） ----------
+# GKE 叢集在 Lab 2 結束時已刪除，之後的 Lab 只需要 v1.1 映像檔
+catchup_lab2() {
+  step "Lab 2｜用 Cloud Build 建置映像檔 quiz-helper:v1.1（約 1～2 分鐘）"
+  build_image v1.1 lab-2
+}
+
 if (( TARGET >= 1 )); then catchup_lab0; fi
 if (( TARGET >= 2 )); then catchup_lab1; fi
+if (( TARGET >= 3 )); then catchup_lab2; fi
 
 echo
 echo "完成：Lab ${TARGET} 的起點已準備好。"

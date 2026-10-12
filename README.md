@@ -37,9 +37,10 @@ app/                應用程式碼
   logs.py           結構化紀錄（標準輸出印 JSON）
   static/           答題頁面與管理頁面
 Dockerfile
-data/questions.csv  範例題庫
+data/questions.csv  範例題庫（Lab 3 另有 questions-more.csv，用來測試上傳自動匯入）
 deploy/vm/          Lab 1：VM 開機指令碼、自訂角色「小幫手值區」定義
 deploy/gke/         Lab 2：Kubernetes 服務帳戶、Deployment、Service 設定檔
+deploy/cloudrun/    Lab 3：Cloud Monitoring 警示政策範本
 labs/               每個階段的步驟說明；catchup.sh 是跟不上進度時用的補進度腳本
 tests/              單元測試
 ```
