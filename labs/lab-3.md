@@ -152,9 +152,11 @@ curl -s ${RUN_URL}/healthz
 
 紀錄的 `resource.type` 從 Lab 1 的 `gce_instance`、Lab 2 的 `k8s_container`，變成 Cloud Run 的 `cloud_run_revision`。
 
+先用手機打開 `RUN_URL`，**故意答錯 3～5 題**，讓等一下的查詢有資料。
+
 **Console**：
 
-1. 導覽選單 →「Logging」→「Logs Explorer」，貼上查詢並執行，確認找得到答錯的紀錄：
+1. 導覽選單 →「Logging」→「Logs Explorer」，**右上角的時間範圍選「過去 1 小時（Last 1 hour）」**，貼上查詢並執行，確認找得到答錯的紀錄：
 
    ```
    resource.type="cloud_run_revision"
@@ -187,8 +189,9 @@ gcloud logging metrics list --filter="name=quiz_helper_wrong_answers"
 列出 `quiz_helper_wrong_answers`。
 
 > 紀錄型指標**只從建立之後開始計算**，建立之前的答錯紀錄不會算進去。
+> Logs Explorer 查不到紀錄時，先檢查時間範圍：如果是固定的日期區間（例如「Oct 10 8:00 AM - Oct 12 11:00 AM」），剛產生的紀錄會落在範圍外。改選「過去 1 小時」再查一次。
 
-用手機故意答錯幾題，等 2～3 分鐘後看指標：
+建立指標之後，再用手機故意答錯幾題（指標只計算建立之後的紀錄），等 2～3 分鐘後看指標：
 
 **Console**：導覽選單 →「Monitoring」→「Metrics Explorer」→ 選取指標，搜尋 `quiz_helper_wrong_answers`（在「Cloud Run 修訂版本」→「Logs-based metric」底下）→ 套用。
 
