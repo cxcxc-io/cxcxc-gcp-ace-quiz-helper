@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .config import project_id
 
 # 模型不寫死在程式裡：啟動後向平台查詢有哪些 Gemini 模型，畫面上讓使用者自己選。
-# 預設選清單裡最新的一個；環境變數 GEMINI_MODEL 有設定時，改用它當預設（步驟 7 用來換模型）
+# 預設選清單裡最新的一個；環境變數 GEMINI_MODEL 有設定時，改用它當預設（選用）
 DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "")
 LOCATION = os.environ.get("GEMINI_LOCATION", "global")
 

@@ -75,7 +75,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 - 打開 Agent Platform 內建的模型可觀察性資訊主頁，看每秒請求數、token 吞吐量、首個 token 延遲
 - 在 Metrics Explorer 查 `aiplatform.googleapis.com/publisher/online_serving/` 底下的指標：token_count、model_invocation_count、model_invocation_latencies、first_token_latencies
-- 依模型名稱篩選，對照階段 4 兩個模型各接一半流量時的差異
+- 依模型名稱篩選，比較學員在「模型」選單選了不同模型時的差異
 
 **應用層**：每次問 AI 寫一筆 `event=ai_explain` 紀錄，欄位見第 3 節。
 
@@ -239,7 +239,6 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 - 部署 v2 時先不導流量（`--no-traffic`）並加上標籤，用測試網址自己試問 AI
 - 用流量分割先導 10% 到 v2，確認沒問題再導 100%
 - 畫面的「模型」選單列出平台上的 Gemini 模型，預設最新的一個，可以自己換
-- 改環境變數 `GEMINI_MODEL` 換預設模型，觀察 Cloud Run 自動產生新修訂版；用流量分割讓兩個預設模型各接一半，比較回答差異
 - 對照實驗：拿掉提示中的正確答案再問一次，看模型會不會自己判斷錯
 - Logging：開啟資料存取稽核紀錄，查 Gemini 被哪個服務身分呼叫；用 `jsonPayload.event="ai_explain"` 看每次的 token 用量與回應時間
 - 對應章節：Cloud Run、IAM 進階、Cloud Logging、AI 代理架構（AI 部分標示非 ACE 考點）
@@ -249,7 +248,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 這是 AI 部分的重點階段，做法見第 2 節「LLM token 與監控」。
 
 - 先執行一段只呼叫問 AI 的小量壓測（例如全班各問 10 次），讓指標有資料
-- 平台層：打開模型可觀察性資訊主頁，在 Metrics Explorer 查 token_count 與 first_token_latencies，依模型名稱比較階段 4 的兩個模型
+- 平台層：打開模型可觀察性資訊主頁，在 Metrics Explorer 查 token_count 與 first_token_latencies，依模型名稱比較不同模型
 - 應用層：用 `output_tokens`、`latency_ms` 建立紀錄型指標，做成「小幫手 LLM 監控」資訊主頁
 - 設定 token 用量異常、AI 呼叫失敗兩個警示，故意狂按問 AI 觸發一次
 - 用 token 數估算一堂課的 AI 費用
