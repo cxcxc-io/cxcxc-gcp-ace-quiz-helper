@@ -361,7 +361,7 @@ labs/               每個階段的步驟說明與 gcloud 指令
 - [ ] Container-Optimized OS 以開機指令碼執行容器時，容器的標準輸出是否自動送進 Cloud Logging、需要哪些中繼資料設定（舊的容器啟動代理程式已於 2026-07-31 關閉）
 - [ ] Gemini 呼叫落在哪一種稽核紀錄、需不需要先開啟資料存取稽核紀錄
 - [ ] 「最新」模型別名在 Gemini Enterprise Agent Platform 上怎麼寫：`gemini-flash-latest` 這類別名官方文件主要列在 Gemini API（AI Studio）；Vertex AI 的自動更新別名則是不加版本號的模型名稱（例如 `gemini-2.5-flash`），只跟到同一代的最新穩定版，不會自動升到下一代。寫 Lab 前要確認哪一種能用、預設值填哪個
-  - 目前處理（lab-4）：預設值用穩定模型名稱 `gemini-3.5-flash`，比較用 `gemini-3.5-flash-lite`，都放在環境變數 `GEMINI_MODEL`；位置用 `global`。實測確認可用後再決定是否改用別名
+  - 目前處理（lab-4）：預設值用 latest 別名 `gemini-flash-latest`，比較用 `gemini-flash-lite-latest`，都放在環境變數 `GEMINI_MODEL`；位置用 `global`。這兩個別名在 Agent Platform 是否可用，待實測確認
 - [ ] 自訂角色「小幫手值區」的四個權限是否足以自動建立值區並讀取 CSV，以及要授予在專案層級
 - [ ] 第 3 節各角色的正式名稱與 ID
 - [ ] 模型可觀察性資訊主頁的位置與 `aiplatform.googleapis.com/publisher/online_serving/` 指標的正式名稱、可篩選的標籤（例如模型名稱、回應代碼）

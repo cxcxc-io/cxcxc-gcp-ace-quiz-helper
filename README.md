@@ -73,7 +73,7 @@ tests/              單元測試
 | `APP_VERSION` | v1 | 映像檔版本，會寫進每筆紀錄 |
 | `BUCKET_NAME` | `<專案 ID>-gcp-ace-cxcxc` | 覆寫值區名稱（講師用，平常不用設） |
 | `GOOGLE_CLOUD_PROJECT` | 自動取得 | 覆寫專案 ID（平常不用設） |
-| `GEMINI_MODEL` | `gemini-3.5-flash` | 問 AI 使用的 Gemini 模型（v2 起），換模型只改這個變數 |
+| `GEMINI_MODEL` | `gemini-flash-latest` | 問 AI 使用的 Gemini 模型（v2 起），換模型只改這個變數 |
 | `GEMINI_LOCATION` | `global` | Gemini 的呼叫位置（v2 起） |
 
 ## 在本機跑單元測試
