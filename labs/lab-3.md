@@ -1,9 +1,9 @@
 # Lab 3：Cloud Run
 
-> 階段 3｜映像檔版本 `v1.1`｜對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
+> 階段 3｜映像檔版本 `v1.1`｜對應章節：Cloud Run、Serverless 架構、Cloud Logging
 
 小幫手的流量只集中在上課時段，GKE 叢集卻整天開著計費。這一段把 Lab 2 的 v1.1 映像檔**原封不動**部署到 Cloud Run：
-不用管叢集、流量來了自動增加執行個體（instance）、沒有流量時縮到零。最後把「答錯次數」做成紀錄型指標（log-based metric）並設定警示。
+不用管叢集、流量來了自動增加執行個體（instance）、沒有流量時縮到零。最後把「答錯次數」做成紀錄型指標（log-based metric）。
 
 ## 完成後你會有
 
@@ -11,7 +11,6 @@
 | --- | --- | --- |
 | Cloud Run 服務 | `quiz-helper` | Cloud Run → 服務 |
 | 紀錄型指標 | `quiz_helper_wrong_answers` | Logging → 紀錄型指標 |
-| 通知管道與警示政策 | 電子郵件、`小幫手答錯太多` | Monitoring → 快訊 |
 
 ## 開始前
 
@@ -46,7 +45,7 @@
 ## 需要的角色
 
 - 專案：**擁有者（Owner，`roles/owner`）**
-  - 若不是擁有者，至少需要：Cloud Run 管理員（`roles/run.admin`）、服務帳戶使用者（`roles/iam.serviceAccountUser`）、記錄設定寫入者（`roles/logging.configWriter`）、Monitoring 編輯者（`roles/monitoring.editor`）
+  - 若不是擁有者，至少需要：Cloud Run 管理員（`roles/run.admin`）、服務帳戶使用者（`roles/iam.serviceAccountUser`）、記錄設定寫入者（`roles/logging.configWriter`）
 
 ## 可能產生的費用
 
@@ -54,7 +53,6 @@
 | --- | --- |
 | Cloud Run | 依請求數與執行時間計費，有每月免費額度；沒有流量時縮到零，**不計費** |
 | Cloud Logging／紀錄型指標 | 在每月免費額度內 |
-| Cloud Monitoring 警示政策 | 可能依警示條件數量計費，金額很小；以官方定價為準 |
 
 實際單價請查 [Cloud Run 定價](https://cloud.google.com/run/pricing)。Cloud Run 服務在 Lab 4、Lab 5 還會用到，**本段結束不需要刪除**；沒有流量時不計費。
 
@@ -72,10 +70,10 @@ else
   git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git "${REPO_DIR}" && cd "${REPO_DIR}"
 fi
 git checkout lab-3
-ls deploy/cloudrun
+git describe --tags
 ```
 
-**預期看到的結果**：列出 `alert-wrong-answers.json`。
+**預期看到的結果**：印出 `lab-3`。
 
 > 若 `git checkout` 顯示「Your local changes ... would be overwritten」，先執行 `git stash`，再重新執行 `git checkout lab-3`。
 
@@ -94,19 +92,14 @@ echo "專案：${PROJECT_ID}｜區域：${REGION}"
 
 > Cloud Shell 斷線重連後變數會消失，請重新執行這一段 `export`。
 
-## 步驟 2：啟用需要的 API
+## 步驟 2：啟用 Cloud Run API
 
-**Console**：導覽選單 →「API 和服務」→「程式庫」，搜尋並啟用：
-
-- Cloud Run Admin API
-- Cloud Monitoring API
+**Console**：導覽選單 →「API 和服務」→「程式庫」，搜尋「Cloud Run Admin API」並啟用。
 
 **gcloud**：
 
 ```bash
-gcloud services enable \
-  run.googleapis.com \
-  monitoring.googleapis.com
+gcloud services enable run.googleapis.com
 ```
 
 **預期看到的結果**：出現 `Operation "operations/..." finished successfully.`，或沒有輸出（代表之前已啟用）。
@@ -195,66 +188,19 @@ gcloud logging metrics list --filter="name=quiz_helper_wrong_answers"
 
 > 紀錄型指標**只從建立之後開始計算**，建立之前的答錯紀錄不會算進去。
 
-## 步驟 5：設定警示政策，答錯太多就寄信
+用手機故意答錯幾題，等 2～3 分鐘後看指標：
 
-設定：**1 分鐘內答錯超過 5 次**，就寄電子郵件通知你。
+**Console**：導覽選單 →「Monitoring」→「Metrics Explorer」→ 選取指標，搜尋 `quiz_helper_wrong_answers`（在「Cloud Run 修訂版本」→「Logs-based metric」底下）→ 套用。
 
-**Console**：
+**預期看到的結果**：折線圖出現資料點，數值就是這段時間答錯的次數。
 
-1. 導覽選單 →「Monitoring」→「快訊」→「編輯通知管道」→「電子郵件」→「新增」，填你的電子郵件，顯示名稱 `小幫手通知`
-2. 回到「快訊」→「建立政策」
-   - 選取指標：搜尋 `quiz_helper_wrong_answers`（在「Cloud Run 修訂版本」→「Logs-based metric」底下）
-   - 轉換資料：滾動視窗 1 分鐘、函式「總和（sum）」；跨時間序列彙整「總和」
-   - 觸發條件：門檻值「高於」`5`
-   - 通知管道：`小幫手通知`
-   - 快訊政策名稱：`小幫手答錯太多`
-   - 按「建立政策」
-
-**gcloud**（把電子郵件換成自己的）：
-
-```bash
-export ALERT_EMAIL=<你的電子郵件>
-
-# 1. 建立電子郵件通知管道，取得它的名稱
-export CHANNEL=$(gcloud beta monitoring channels create \
-  --display-name="小幫手通知" \
-  --type=email \
-  --channel-labels=email_address=${ALERT_EMAIL} \
-  --format="value(name)")
-echo ${CHANNEL}
-
-# 2. 用範本建立警示政策（deploy/cloudrun/alert-wrong-answers.json）
-sed "s|\${CHANNEL}|${CHANNEL}|g" deploy/cloudrun/alert-wrong-answers.json > /tmp/alert-policy.json
-gcloud alpha monitoring policies create --policy-from-file=/tmp/alert-policy.json
-```
-
-**預期看到的結果**：`echo` 印出 `projects/<專案 ID>/notificationChannels/<數字>`；建立政策後印出 `Created alert policy [projects/<專案 ID>/alertPolicies/<數字>]`。Console「Monitoring」→「快訊」看到 `小幫手答錯太多`。
-
-3. 觸發一次警示：連續送出 10 個一定答錯的答案（`Z` 不是任何選項）：
-
-```bash
-for i in $(seq 10); do
-  curl -s -X POST ${RUN_URL}/api/answer \
-    -H "Content-Type: application/json" \
-    -d '{"nickname":"alert-test","question_id":"001","choice":"Z","elapsed_ms":1000}' > /dev/null
-done
-echo "已送出 10 個錯誤答案"
-```
-
-**預期看到的結果**：約 **3～5 分鐘**內：
-
-- Console「Monitoring」→「快訊」出現一個事件（incident），狀態「開啟」
-- 你的信箱收到標題含 `小幫手答錯太多` 的通知信
-
-沒有新的答錯紀錄後，事件會自動關閉（政策設定 30 分鐘後自動關閉）。
-
-> 紀錄型指標從寫入紀錄到出現在 Monitoring，會有幾分鐘延遲。超過 10 分鐘還沒收到信，先確認步驟 4 的指標在 Metrics Explorer 有資料。
+> 紀錄型指標可以用來畫資訊主頁，也能設定警示政策（例如答錯太多就寄信）；警示政策會在 Lab 5 的 LLM 監控實作。
 
 ## 想一想
 
 - **部署變簡單了**：沒有 VM、沒有叢集、沒有防火牆和負載平衡器，`gcloud run deploy` 一行就有 HTTPS 網址
 - **沒人用就不花錢**：沒有流量時縮到零
-- **看得見異常**：答錯次數變成指標，超過門檻就通知
+- **紀錄變指標**：答錯次數變成可以畫圖的指標
 
 Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 
@@ -265,7 +211,7 @@ Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 - [ ] Cloud Run 服務 `quiz-helper` 使用服務帳戶 `quiz-helper`，手機打得開
 - [ ] Logs Explorer 用 `resource.type="cloud_run_revision"` 找得到答題紀錄
 - [ ] 紀錄型指標 `quiz_helper_wrong_answers` 建立完成
-- [ ] 送出錯誤答案後收到警示通知信
+- [ ] Metrics Explorer 看得到答錯次數的資料點
 
 ## 清理
 
@@ -273,26 +219,11 @@ Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 
 **Cloud Run 服務、紀錄型指標，Lab 4、Lab 5 還會用到，先不要刪**；Cloud Run 沒有流量時縮到零，不計費。
 
-警示政策不想再收到信，可以先停用（Console「Monitoring」→「快訊」→ 點政策 → 停用），或執行：
-
-```bash
-export POLICY=$(gcloud alpha monitoring policies list --filter='displayName="小幫手答錯太多"' --format="value(name)")
-gcloud alpha monitoring policies update ${POLICY} --no-enabled
-```
-
 ### 課程全部結束時
 
 ```bash
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
-
-# 刪除警示政策與通知管道
-for POLICY in $(gcloud alpha monitoring policies list --filter='displayName="小幫手答錯太多"' --format="value(name)"); do
-  gcloud alpha monitoring policies delete ${POLICY} --quiet
-done
-for CHANNEL in $(gcloud beta monitoring channels list --filter='displayName="小幫手通知"' --format="value(name)"); do
-  gcloud beta monitoring channels delete ${CHANNEL} --quiet
-done
 
 # 刪除紀錄型指標與 Cloud Run 服務
 gcloud logging metrics delete quiz_helper_wrong_answers --quiet

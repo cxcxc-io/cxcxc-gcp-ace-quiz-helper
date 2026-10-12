@@ -192,7 +192,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 | 0. 打包 | 小幫手要上雲 | — | — | v1 |
 | 1. Container on VM | 先求能上線 | Compute Engine | Logs Explorer 基本查詢 | v1 |
 | 2. GKE | 開課日湧入大量學員 | GKE Autopilot | 結構化欄位篩選 | v1 → v1.1 |
-| 3. Cloud Run | 流量只集中在上課時段 | Cloud Run | 紀錄型指標＋警示 | v1.1 |
+| 3. Cloud Run | 流量只集中在上課時段 | Cloud Run | 紀錄型指標 | v1.1 |
 | 4. 加上 AI | 學員想知道為什麼對或錯 | Cloud Run | 稽核紀錄 | v2 |
 | 5. LLM 監控 | 老闆問 AI 花了多少錢、穩不穩 | Cloud Run | 模型可觀察性資訊主頁、token 指標、LLM 警示 | v2 |
 | 6. 收尾 | 紀錄要長期保存、雜訊要過濾 | — | 接收器＋排除篩選器 | v2 |
@@ -229,8 +229,8 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 - 同一個 v1.1 映像檔部署成 Cloud Run 服務，指定服務身分，開放未驗證存取
 - 說明自動擴充與縮到零（在 Console 指標頁看執行個體數量），不實作高併發或壓測
-- Logging：把「答錯次數」做成紀錄型指標，設一個警示政策；`resource.type` 變成 `cloud_run_revision`
-- 對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
+- Logging：把「答錯次數」做成紀錄型指標，在 Metrics Explorer 查看（不設警示政策，警示留到階段 5）；`resource.type` 變成 `cloud_run_revision`
+- 對應章節：Cloud Run、Serverless 架構、Cloud Logging
 
 ### 階段 4：加上 AI
 
@@ -278,7 +278,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 | lab-0 | 應用程式碼、Dockerfile、範例題庫 CSV | 開始階段 1 前 |
 | lab-1 | 加上 VM 開機指令碼、自訂角色定義 | 開始階段 2 前 |
 | lab-2 | 加上 GKE 設定檔、v1.1 程式碼 | 開始階段 3 前 |
-| lab-3 | 加上 Cloud Run 指令、警示政策範本 | 開始階段 4 前 |
+| lab-3 | 加上 Cloud Run 指令 | 開始階段 4 前 |
 | lab-4 | 加上問 AI 功能（v2） | 開始階段 5 前 |
 | lab-5 | 加上 LLM 監控的指標、資訊主頁與警示設定 | 開始階段 6 前 |
 | lab-6 | 加上接收器與清理指令，完整版 | 課後參考 |
@@ -295,7 +295,7 @@ Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          VM 開機指令碼
 deploy/gke/         Kubernetes 服務帳戶、Deployment、Service 設定檔
-deploy/cloudrun/    Cloud Run 相關設定（警示政策範本）；部署指令寫在 labs/lab-3.md
+deploy/cloudrun/    Cloud Run 相關設定（Lab 3 的部署指令寫在 labs/lab-3.md）
 labs/               每個階段的步驟說明與 gcloud 指令
 ```
 
@@ -347,7 +347,7 @@ labs/               每個階段的步驟說明與 gcloud 指令
 
 - [ ] 刪除 VM 與防火牆規則
 - [ ] 刪除 GKE 叢集
-- [ ] 刪除 Cloud Run 服務、紀錄型指標與警示政策
+- [ ] 刪除 Cloud Run 服務與答錯次數的紀錄型指標
 - [ ] 刪除 LLM 監控的警示政策、資訊主頁與紀錄型指標
 - [ ] 刪除接收器與 BigQuery 資料集
 - [ ] 刪除 Artifact Registry 存放區與值區
