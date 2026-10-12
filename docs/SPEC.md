@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | 暱稱 | 開頁面時輸入暱稱，存在瀏覽器；不驗證、不註冊 | 1 起 |
 | 答題 | 從 Firestore 隨機取一題，作答後顯示對錯與正確答案 | 1 起 |
-| 題庫匯入 | 讀取值區裡的 CSV，寫進 Firestore | 1 起（手動）；3 起改為上傳自動觸發 |
+| 題庫匯入 | 讀取值區裡的 CSV，寫進 Firestore | 1 起（管理頁面手動觸發） |
 | 問 AI | 答完後按「問 AI」，Gemini 解析為什麼對或錯 | 4 |
 
 ### 題庫 CSV 格式
@@ -111,7 +111,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 其他約定：
 
 - 監聽埠號讀環境變數 `PORT`（Cloud Run 會設定），預設 8080
-- 匯入端點同時支援管理頁面手動觸發與 Eventarc 送來的 CloudEvent
+- 匯入由管理頁面手動觸發（程式也能接收 Eventarc 送來的 CloudEvent，但課程不使用：學員答題不經過 Eventarc，上傳自動匯入的設定步驟多、易卡關）
 - 健康檢查用獨立的 `/healthz`，方便階段 6 用排除篩選器濾掉它的紀錄
 - 程式碼以好讀為優先：學員不寫程式，但會打開來看「呼叫 Gemini 的那幾行」
 
@@ -228,7 +228,6 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 ### 階段 3：Cloud Run
 
 - 同一個 v1.1 映像檔部署成 Cloud Run 服務，指定服務身分，開放未驗證存取
-- 建立 Eventarc 觸發條件：值區有新 CSV 時，自動呼叫小幫手的匯入端點
 - 用 `/healthz` 回報的執行個體 ID 觀察擴充：同時送一批請求，把並行數（concurrency）改成 1 後看到執行個體變多；閒置後看縮到零與冷啟動（不使用壓測腳本）
 - Logging：把「答錯次數」做成紀錄型指標，設一個警示政策；`resource.type` 變成 `cloud_run_revision`
 - 對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
@@ -279,7 +278,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 | lab-0 | 應用程式碼、Dockerfile、範例題庫 CSV | 開始階段 1 前 |
 | lab-1 | 加上 VM 開機指令碼、自訂角色定義 | 開始階段 2 前 |
 | lab-2 | 加上 GKE 設定檔、v1.1 程式碼 | 開始階段 3 前 |
-| lab-3 | 加上 Cloud Run 與 Eventarc 指令、警示政策範本、第二份範例題庫 | 開始階段 4 前 |
+| lab-3 | 加上 Cloud Run 指令、警示政策範本 | 開始階段 4 前 |
 | lab-4 | 加上問 AI 功能（v2） | 開始階段 5 前 |
 | lab-5 | 加上 LLM 監控的指標、資訊主頁與警示設定 | 開始階段 6 前 |
 | lab-6 | 加上接收器與清理指令，完整版 | 課後參考 |
@@ -296,7 +295,7 @@ Dockerfile
 data/questions.csv  範例題庫
 deploy/vm/          VM 開機指令碼
 deploy/gke/         Kubernetes 服務帳戶、Deployment、Service 設定檔
-deploy/cloudrun/    Cloud Run 相關設定（警示政策範本）；部署與 Eventarc 指令寫在 labs/lab-3.md
+deploy/cloudrun/    Cloud Run 相關設定（警示政策範本）；部署指令寫在 labs/lab-3.md
 labs/               每個階段的步驟說明與 gcloud 指令
 ```
 
@@ -348,7 +347,7 @@ labs/               每個階段的步驟說明與 gcloud 指令
 
 - [ ] 刪除 VM 與防火牆規則
 - [ ] 刪除 GKE 叢集
-- [ ] 刪除 Cloud Run 服務與 Eventarc 觸發條件
+- [ ] 刪除 Cloud Run 服務、紀錄型指標與警示政策
 - [ ] 刪除 LLM 監控的警示政策、資訊主頁與紀錄型指標
 - [ ] 刪除接收器與 BigQuery 資料集
 - [ ] 刪除 Artifact Registry 存放區與值區
@@ -370,6 +369,5 @@ labs/               每個階段的步驟說明與 gcloud 指令
 - [ ] GKE Autopilot 叢集管理費與免費額度
 - [ ] Firestore 免費額度是否只適用 (default) 資料庫
 - [ ] Cloud Run 開放未驗證存取的現行做法（`--allow-unauthenticated` 與 `--no-invoker-iam-check`）
-- [ ] Eventarc 觸發條件呼叫同一個 Cloud Run 服務的匯入端點時，需要的服務帳戶與角色
 
 參考：[Compute Engine container startup agent deprecation](https://docs.cloud.google.com/compute/docs/deprecations/container-startup-agent-on-compute)

@@ -3,14 +3,13 @@
 > 階段 3｜映像檔版本 `v1.1`｜對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
 
 小幫手的流量只集中在上課時段，GKE 叢集卻整天開著計費。這一段把 Lab 2 的 v1.1 映像檔**原封不動**部署到 Cloud Run：
-不用管叢集、流量來了自動增加執行個體（instance）、沒有流量時縮到零。再用 Eventarc 讓「上傳題庫 CSV」自動觸發匯入，最後把「答錯次數」做成紀錄型指標（log-based metric）並設定警示。
+不用管叢集、流量來了自動增加執行個體（instance）、沒有流量時縮到零。最後把「答錯次數」做成紀錄型指標（log-based metric）並設定警示。
 
 ## 完成後你會有
 
 | 資源 | 名稱 | 在 Console 哪裡看 |
 | --- | --- | --- |
 | Cloud Run 服務 | `quiz-helper` | Cloud Run → 服務 |
-| Eventarc 觸發條件 | `quiz-helper-csv` | Eventarc → 觸發條件 |
 | 紀錄型指標 | `quiz_helper_wrong_answers` | Logging → 紀錄型指標 |
 | 通知管道與警示政策 | 電子郵件、`小幫手答錯太多` | Monitoring → 快訊 |
 
@@ -47,14 +46,13 @@
 ## 需要的角色
 
 - 專案：**擁有者（Owner，`roles/owner`）**
-  - 若不是擁有者，至少需要：Cloud Run 管理員（`roles/run.admin`）、服務帳戶使用者（`roles/iam.serviceAccountUser`）、Eventarc 管理員（`roles/eventarc.admin`）、專案 IAM 管理員（`roles/resourcemanager.projectIamAdmin`）、記錄設定寫入者（`roles/logging.configWriter`）、Monitoring 編輯者（`roles/monitoring.editor`）、Storage 管理員（`roles/storage.admin`）
+  - 若不是擁有者，至少需要：Cloud Run 管理員（`roles/run.admin`）、服務帳戶使用者（`roles/iam.serviceAccountUser`）、記錄設定寫入者（`roles/logging.configWriter`）、Monitoring 編輯者（`roles/monitoring.editor`）
 
 ## 可能產生的費用
 
 | 項目 | 說明 |
 | --- | --- |
 | Cloud Run | 依請求數與執行時間計費，有每月免費額度；沒有流量時縮到零，**不計費** |
-| Eventarc／Pub/Sub | Cloud Storage 事件經過 Pub/Sub 傳送，本課程用量在免費額度內 |
 | Cloud Logging／紀錄型指標 | 在每月免費額度內 |
 | Cloud Monitoring 警示政策 | 可能依警示條件數量計費，金額很小；以官方定價為準 |
 
@@ -74,10 +72,10 @@ else
   git clone https://github.com/cxcxc-io/cxcxc-gcp-ace-quiz-helper.git "${REPO_DIR}" && cd "${REPO_DIR}"
 fi
 git checkout lab-3
-ls deploy/cloudrun data
+ls deploy/cloudrun
 ```
 
-**預期看到的結果**：列出 `alert-wrong-answers.json`，以及 `questions.csv`、`questions-more.csv`。
+**預期看到的結果**：列出 `alert-wrong-answers.json`。
 
 > 若 `git checkout` 顯示「Your local changes ... would be overwritten」，先執行 `git stash`，再重新執行 `git checkout lab-3`。
 
@@ -86,15 +84,13 @@ ls deploy/cloudrun data
 ```bash
 gcloud config set project <你的專案 ID>   # 只有這一行要自己換成專案 ID
 export PROJECT_ID=$(gcloud config get-value project)
-export PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
 export REGION=asia-east1
 export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
 export IMAGE_V11=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1.1
-export BUCKET=${PROJECT_ID}-gcp-ace-cxcxc
-echo "專案：${PROJECT_ID}（編號 ${PROJECT_NUMBER}）｜區域：${REGION}"
+echo "專案：${PROJECT_ID}｜區域：${REGION}"
 ```
 
-**預期看到的結果**：印出你的專案 ID、專案編號與 `asia-east1`。若專案 ID 不對，重新執行 `gcloud config set project` 這一行。
+**預期看到的結果**：印出你的專案 ID 與 `asia-east1`。若專案 ID 不對，重新執行 `gcloud config set project` 這一行。
 
 > Cloud Shell 斷線重連後變數會消失，請重新執行這一段 `export`。
 
@@ -103,8 +99,6 @@ echo "專案：${PROJECT_ID}（編號 ${PROJECT_NUMBER}）｜區域：${REGION}"
 **Console**：導覽選單 →「API 和服務」→「程式庫」，搜尋並啟用：
 
 - Cloud Run Admin API
-- Eventarc API
-- Cloud Pub/Sub API
 - Cloud Monitoring API
 
 **gcloud**：
@@ -112,8 +106,6 @@ echo "專案：${PROJECT_ID}（編號 ${PROJECT_NUMBER}）｜區域：${REGION}"
 ```bash
 gcloud services enable \
   run.googleapis.com \
-  eventarc.googleapis.com \
-  pubsub.googleapis.com \
   monitoring.googleapis.com
 ```
 
@@ -160,117 +152,7 @@ curl -s ${RUN_URL}/healthz
 
 > 比較 Lab 1、Lab 2：不用開防火牆、不用建負載平衡器，Cloud Run 直接給一個 HTTPS 網址。
 
-## 步驟 4：建立 Eventarc 觸發條件，上傳 CSV 自動匯入
-
-到目前為止，上傳題庫後都要打開管理頁面按「匯入」。這一步讓 **Cloud Storage 有新檔案時，Eventarc 自動呼叫小幫手的匯入端點 `/api/import`**。
-
-```
-上傳 CSV 到值區 ──事件──▶ Eventarc 觸發條件 ──HTTP POST──▶ Cloud Run 小幫手 /api/import ──▶ Firestore
-```
-
-1. 允許 Cloud Storage 發送事件：Cloud Storage 的服務代理（service agent）要能把事件發布到 Pub/Sub。
-
-```bash
-export GCS_AGENT=$(gcloud storage service-agent --project=${PROJECT_ID})
-echo ${GCS_AGENT}
-gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-  --member="serviceAccount:${GCS_AGENT}" \
-  --role="roles/pubsub.publisher" \
-  --condition=None \
-  --format=none
-```
-
-**預期看到的結果**：`echo` 印出 `service-<專案編號>@gs-project-accounts.iam.gserviceaccount.com`；授權指令沒有錯誤訊息。
-
-2. 授予觸發條件使用的服務帳戶（這裡沿用 `quiz-helper`）兩個角色：接收事件、呼叫 Cloud Run 服務。
-
-| 角色 | 用途 |
-| --- | --- |
-| Eventarc 事件接收者（`roles/eventarc.eventReceiver`） | 讓觸發條件以這個服務帳戶接收事件 |
-| Cloud Run 叫用者（`roles/run.invoker`） | 讓觸發條件以這個服務帳戶呼叫 Cloud Run 服務 |
-
-```bash
-for ROLE in roles/eventarc.eventReceiver roles/run.invoker; do
-  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --role="${ROLE}" \
-    --condition=None \
-    --format=none
-done
-```
-
-**預期看到的結果**：沒有錯誤訊息。
-
-3. 建立觸發條件：值區 `${BUCKET}` 有物件「建立完成（finalized）」時，呼叫 Cloud Run 服務 `quiz-helper` 的 `/api/import`。
-
-**Console**：導覽選單 →「Eventarc」→「觸發條件」→「建立觸發條件」
-
-- 觸發條件名稱：`quiz-helper-csv`
-- 觸發條件類型：Google 來源
-- 事件提供者：Cloud Storage；事件類型：`google.cloud.storage.object.v1.finalized`
-- 值區：`<專案 ID>-gcp-ace-cxcxc`
-- 區域：`asia-east1`
-- 服務帳戶：`quiz-helper`
-- 事件目的地：Cloud Run；服務：`quiz-helper`；服務網址路徑：`/api/import`
-- 按「建立」
-
-**gcloud**：
-
-```bash
-gcloud eventarc triggers create quiz-helper-csv \
-  --location=${REGION} \
-  --destination-run-service=quiz-helper \
-  --destination-run-region=${REGION} \
-  --destination-run-path=/api/import \
-  --event-filters="type=google.cloud.storage.object.v1.finalized" \
-  --event-filters="bucket=${BUCKET}" \
-  --service-account=${SA_EMAIL}
-```
-
-**預期看到的結果**：
-
-```bash
-gcloud eventarc triggers list --location=${REGION}
-```
-
-列出 `quiz-helper-csv`，`ACTIVE` 欄位是 `Yes`。觸發條件建立後**可能要等一兩分鐘才會生效**。
-
-> 出現與 Pub/Sub 服務代理權限有關的錯誤：較舊的專案（2021 年 4 月以前啟用 Pub/Sub）需要另外授權，請把錯誤訊息回報講師。
-
-4. 測試：上傳第二份題庫 `data/questions-more.csv`（3 題新題目：006～008），**不要按管理頁面的匯入**。
-
-```bash
-gcloud storage cp data/questions-more.csv gs://${BUCKET}/
-```
-
-等約 30 秒～1 分鐘後確認：
-
-- **Logs Explorer** 查詢：
-
-  ```
-  resource.type="cloud_run_revision"
-  jsonPayload.event="import"
-  jsonPayload.trigger="eventarc"
-  ```
-
-  看到一筆 `questions-more.csv 匯入 3 題，略過 0 列`
-- **Firestore** →「資料」→ `questions` 集合：多了 `006`～`008`，總共 8 題
-- 手機多答幾題，會開始出現 006～008 的題目
-
-**gcloud**：
-
-```bash
-gcloud logging read \
-  'resource.type="cloud_run_revision" AND jsonPayload.event="import" AND jsonPayload.trigger="eventarc"' \
-  --limit=3 --format="value(timestamp, jsonPayload.message)"
-```
-
-**預期看到的結果**：列出 `questions-more.csv 匯入 3 題，略過 0 列`。
-
-> 上傳的不是 `.csv`（例如圖片），小幫手會寫一筆「略過事件」的紀錄，不會匯入。
-> 再上傳一次同一個檔案也沒關係：同一個題號會覆蓋同一題，不會重複。
-
-## 步驟 5：看執行個體自動增加，認識「並行（concurrency）」
+## 步驟 4：看執行個體自動增加，認識「並行（concurrency）」
 
 Cloud Run 依請求量自動增減執行個體。每個執行個體同時能處理幾個請求，由**並行（concurrency）**設定決定（預設 80）。小幫手的 `/healthz` 會回報是哪一個執行個體回應，所以同時送一批請求，就能數出有幾個執行個體在工作。
 
@@ -316,7 +198,7 @@ gcloud run services update quiz-helper --region=${REGION} --concurrency=80
 
 > 比較 Lab 2：GKE 的 Deployment 至少保留你指定的 Pod 數，沒人用也照樣計費；Cloud Run 預設可以縮到零。
 
-## 步驟 6：把「答錯次數」做成紀錄型指標
+## 步驟 5：把「答錯次數」做成紀錄型指標
 
 每次作答，小幫手都會寫一筆 `jsonPayload.event="answer"` 的紀錄。**紀錄型指標（log-based metric）**會計算符合篩選條件的紀錄數量，變成可以畫圖、設警示的指標。
 
@@ -358,7 +240,7 @@ gcloud logging metrics list --filter="name=quiz_helper_wrong_answers"
 
 > 紀錄型指標**只從建立之後開始計算**，建立之前的答錯紀錄不會算進去。
 
-## 步驟 7：設定警示政策，答錯太多就寄信
+## 步驟 6：設定警示政策，答錯太多就寄信
 
 設定：**1 分鐘內答錯超過 5 次**，就寄電子郵件通知你。
 
@@ -411,12 +293,11 @@ echo "已送出 10 個錯誤答案"
 
 沒有新的答錯紀錄後，事件會自動關閉（政策設定 30 分鐘後自動關閉）。
 
-> 紀錄型指標從寫入紀錄到出現在 Monitoring，會有幾分鐘延遲。超過 10 分鐘還沒收到信，先確認步驟 6 的指標在 Metrics Explorer 有資料。
+> 紀錄型指標從寫入紀錄到出現在 Monitoring，會有幾分鐘延遲。超過 10 分鐘還沒收到信，先確認步驟 5 的指標在 Metrics Explorer 有資料。
 
 ## 想一想
 
 - **部署變簡單了**：沒有 VM、沒有叢集、沒有防火牆和負載平衡器，`gcloud run deploy` 一行就有 HTTPS 網址
-- **自動化**：上傳 CSV 就自動匯入，不用再開管理頁面
 - **看得見異常**：答錯次數變成指標，超過門檻就通知
 
 Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
@@ -426,7 +307,6 @@ Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 ## 本段檢查清單
 
 - [ ] Cloud Run 服務 `quiz-helper` 使用服務帳戶 `quiz-helper`，手機打得開
-- [ ] 上傳 `questions-more.csv` 後，沒有按匯入就自動多了 3 題
 - [ ] 並行數改成 1 時，`/healthz` 數得到好幾個執行個體
 - [ ] Logs Explorer 用 `resource.type="cloud_run_revision"` 找得到答題紀錄
 - [ ] 紀錄型指標 `quiz_helper_wrong_answers` 建立完成
@@ -436,7 +316,7 @@ Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 
 ### Lab 3 結束時
 
-**Cloud Run 服務、Eventarc 觸發條件、紀錄型指標，Lab 4、Lab 5 還會用到，先不要刪**；Cloud Run 沒有流量時縮到零，不計費。
+**Cloud Run 服務、紀錄型指標，Lab 4、Lab 5 還會用到，先不要刪**；Cloud Run 沒有流量時縮到零，不計費。
 
 警示政策不想再收到信，可以先停用（Console「Monitoring」→「快訊」→ 點政策 → 停用），或執行：
 
@@ -450,7 +330,6 @@ gcloud alpha monitoring policies update ${POLICY} --no-enabled
 ```bash
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
-export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
 
 # 刪除警示政策與通知管道
 for POLICY in $(gcloud alpha monitoring policies list --filter='displayName="小幫手答錯太多"' --format="value(name)"); do
@@ -460,26 +339,16 @@ for CHANNEL in $(gcloud beta monitoring channels list --filter='displayName="小
   gcloud beta monitoring channels delete ${CHANNEL} --quiet
 done
 
-# 刪除紀錄型指標、Eventarc 觸發條件、Cloud Run 服務
+# 刪除紀錄型指標與 Cloud Run 服務
 gcloud logging metrics delete quiz_helper_wrong_answers --quiet
-gcloud eventarc triggers delete quiz-helper-csv --location=${REGION} --quiet
 gcloud run services delete quiz-helper --region=${REGION} --quiet
-
-# 移除授權
-for ROLE in roles/eventarc.eventReceiver roles/run.invoker; do
-  gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
-    --member="serviceAccount:${SA_EMAIL}" --role="${ROLE}" --condition=None --format=none
-done
-gcloud projects remove-iam-policy-binding ${PROJECT_ID} \
-  --member="serviceAccount:$(gcloud storage service-agent --project=${PROJECT_ID})" \
-  --role="roles/pubsub.publisher" --condition=None --format=none
 ```
 
 **預期看到的結果**：
 
 ```bash
 gcloud run services list --region=${REGION}
-gcloud eventarc triggers list --location=${REGION}
+gcloud logging metrics list --filter="name=quiz_helper_wrong_answers"
 ```
 
 兩個指令都沒有 `quiz-helper` 相關的項目。
