@@ -89,15 +89,15 @@ export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
 export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
 export IMAGE_V2=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v2
-export MODEL_A=gemini-flash-latest
-export MODEL_B=gemini-flash-lite-latest
+export MODEL_A=gemini-3.8-flash
+export MODEL_B=gemini-3.5-flash-lite
 export RUN_URL=$(gcloud run services describe quiz-helper --region=${REGION} --format="value(status.url)")
 echo "專案：${PROJECT_ID}｜小幫手網址：${RUN_URL}"
 ```
 
 **預期看到的結果**：印出你的專案 ID 與 `https://quiz-helper-....run.app`。
 
-> `MODEL_A`、`MODEL_B` 是本段要比較的兩個模型，都用「latest」別名：自動指向最新的 Gemini Flash 與 Flash-Lite，不用改程式就能跟上新模型。若步驟 5 出現找不到模型（404、`NOT_FOUND`）的錯誤，請到 Console「Gemini Enterprise Agent Platform」→「Model Garden」查目前可用的 Gemini Flash 模型名稱，換掉這兩個變數。
+> `MODEL_A`、`MODEL_B` 是本段要比較的兩個模型：目前最新的 Gemini Flash 與 Flash-Lite。Gemini Enterprise Agent Platform 的模型名稱要帶版本號，沒有 Gemini API（AI Studio）那種 `gemini-flash-latest` 別名，寫成別名會得到 404 `NOT_FOUND`。Google 推出新版、或舊版退役時，到 Console「Gemini Enterprise Agent Platform」→「Model Garden」查目前的 Gemini Flash 模型名稱，換掉這兩個變數即可，不用改程式。
 
 ## 步驟 2：啟用 API，授予服務身分呼叫 Gemini 的角色
 
@@ -174,7 +174,7 @@ gcloud builds submit --tag ${IMAGE_V2} .
 **Console**：「Cloud Run」→ 點 `quiz-helper` →「編輯並部署新的修訂版本」
 
 - 容器映像檔網址：選 `quiz-helper:v2`
-- 「變數與密鑰」分頁 → 新增變數：名稱 `GEMINI_MODEL`，值 `gemini-flash-latest`
+- 「變數與密鑰」分頁 → 新增變數：名稱 `GEMINI_MODEL`，值 `gemini-3.8-flash`
 - 取消勾選「**立即將這個修訂版本做為服務流量**」
 - 按「部署」，完成後到「修訂版本」分頁，在新修訂版的選單「管理修訂版本網址（標記）」加上標記 `v2-flash`
 
@@ -269,7 +269,7 @@ gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-f
 
 用手機在正式網址多問幾次 AI，題目下方的「這一題由 Cloud Run「quiz-helper-0000x-…」回應」會在兩個修訂版之間變換。比較兩個模型：回答速度、內容詳細程度有沒有差別？
 
-> **模型用「latest」別名的取捨**：`gemini-flash-latest` 會自動指向最新的模型，不用改程式就能跟上新模型；但新版上線時回答風格可能改變。正式產品通常會固定版本號（例如寫成帶版本的模型名稱），想換新版時再自己改環境變數。
+> **為什麼模型名稱放在環境變數**：Agent Platform 的模型名稱帶版本號，每個版本都有退役日期。名稱放在環境變數 `GEMINI_MODEL`，換新版只要部署一個新修訂版（像本步驟這樣），先切一部分流量試，回答品質沒問題再全部切過去，不用改程式、不用重建映像檔。
 
 ## 步驟 8：對照實驗——不給 AI 正確答案
 

@@ -14,9 +14,9 @@ from pydantic import BaseModel, Field
 
 from .config import project_id
 
-# 模型與位置都從環境變數讀取；改環境變數就能換模型。
-# 預設用「latest」別名：自動指向最新的 Gemini Flash，不用改程式就能跟上新模型
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+# 模型與位置都從環境變數讀取；改環境變數就能換模型，不用重建映像檔。
+# Agent Platform 要寫帶版本號的模型名稱（沒有 latest 別名），新版上線時改這個變數即可
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 LOCATION = os.environ.get("GEMINI_LOCATION", "global")
 
 # 系統指示：設定 AI 的角色與回答規則，每次呼叫都一樣
