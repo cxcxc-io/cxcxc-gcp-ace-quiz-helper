@@ -136,10 +136,12 @@ gcloud run deploy quiz-helper \
 ```bash
 export RUN_URL=$(gcloud run services describe quiz-helper --region=${REGION} --format="value(status.url)")
 echo "小幫手網址：${RUN_URL}"
-curl -s ${RUN_URL}/healthz
+curl -s ${RUN_URL}/api/question | grep -o '"version".*'
 ```
 
-**預期看到的結果**：`{"status":"ok","version":"v1.1","platform":"Cloud Run","instance":"quiz-helper-00001-xxx / 1a2b3c4d"}`（`instance` 是修訂版名稱與執行個體 ID）。
+**預期看到的結果**：`"version":"v1.1","platform":"Cloud Run","instance":"quiz-helper-00001-xxx / 1a2b3c4d"}`（`instance` 是修訂版名稱與執行個體 ID）。用補進度腳本、還沒匯入題庫的學員，會看到「題庫是空的」，先依下面的說明匯入再試。
+
+> 為什麼不用 Lab 1、Lab 2 的 `/healthz`？Cloud Run 保留了一些路徑，**以 `z` 結尾的路徑（例如 `/healthz`）可能被 Google 前端直接攔下、回 404**，請求不會送到容器。所以在 Cloud Run 上改用 `/api/question`，它的回應裡也有版本與執行個體名稱。部署到 Cloud Run 的服務，路徑最好避開 `z` 結尾。
 
 用手機打開 `RUN_URL`（這次是 `https://`），答幾題：題庫沿用 Lab 1 匯入 Firestore 的題目，題目下方顯示「這一題由 Cloud Run「quiz-helper-00001-… / …」回應」。**用補進度腳本的學員**，請先打開 `${RUN_URL}/admin` 按 `questions.csv` 的「匯入」。
 

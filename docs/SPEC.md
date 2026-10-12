@@ -113,6 +113,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 - 監聽埠號讀環境變數 `PORT`（Cloud Run 會設定），預設 8080
 - 匯入由管理頁面手動觸發（程式也能接收 Eventarc 送來的 CloudEvent，但課程不使用：學員答題不經過 Eventarc，上傳自動匯入的設定步驟多、易卡關）
 - 健康檢查用獨立的 `/healthz`，方便階段 6 用排除篩選器濾掉它的紀錄
+- Cloud Run 會保留以 `z` 結尾的路徑（`/healthz` 在 Cloud Run 上會被攔下回 404），所以 Cloud Run 的 Lab 改用 `/api/question` 回應裡的 `version`、`platform`、`instance` 確認版本與執行個體
 - 程式碼以好讀為優先：學員不寫程式，但會打開來看「呼叫 Gemini 的那幾行」
 
 ### 資源命名

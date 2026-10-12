@@ -199,9 +199,11 @@ export V2_URL=$(gcloud run services describe quiz-helper --region=${REGION} \
   --format=json | python3 -c "import json,sys; print([t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag')=='v2-flash'][0])")
 echo "正式網址：${RUN_URL}"
 echo "v2 測試網址：${V2_URL}"
-curl -s ${RUN_URL}/healthz; echo
-curl -s ${V2_URL}/healthz; echo
+curl -s ${RUN_URL}/api/question | grep -o '"version":"[^"]*"'
+curl -s ${V2_URL}/api/question | grep -o '"version":"[^"]*"'
 ```
+
+> 在 Cloud Run 上用 `/api/question` 確認版本：以 `z` 結尾的 `/healthz` 會被 Cloud Run 保留路徑攔下（見 Lab 3 步驟 3）。
 
 **預期看到的結果**：正式網址回 `"version":"v1.1"`，測試網址回 `"version":"v2"`。
 
@@ -225,7 +227,7 @@ gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-f
 連續問 20 次正式網址，數一數各版本出現幾次：
 
 ```bash
-for i in $(seq 20); do curl -s ${RUN_URL}/healthz | grep -o '"version":"[^"]*"'; done | sort | uniq -c
+for i in $(seq 20); do curl -s ${RUN_URL}/api/question | grep -o '"version":"[^"]*"'; done | sort | uniq -c
 ```
 
 **預期看到的結果**：大部分是 `"version":"v1.1"`，少數幾次是 `"version":"v2"`（比例大約 9:1，次數少時不會剛好）。
@@ -336,7 +338,7 @@ gcloud logging read \
 
 - [ ] 服務帳戶 `quiz-helper` 有 `roles/aiplatform.user`，程式與環境變數裡沒有任何 API 金鑰
 - [ ] 用 `--no-traffic` 與標記 `v2-flash` 部署，測試網址能問 AI，正式網址仍是 v1.1
-- [ ] 流量分割 10% → 100%，`/healthz` 看得到版本比例變化
+- [ ] 流量分割 10% → 100%，`/api/question` 看得到版本比例變化
 - [ ] 只改環境變數就部署出模型 B 的修訂版，兩個模型各接 50%
 - [ ] 勾選對照實驗，比較有沒有給答案的差別
 - [ ] Logs Explorer 看得到 `ai_explain` 紀錄的 token 數，稽核紀錄看得到 `quiz-helper` 呼叫 Gemini
