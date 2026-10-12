@@ -362,7 +362,7 @@ labs/               每個階段的步驟說明與 gcloud 指令
 - [ ] Container-Optimized OS 以開機指令碼執行容器時，容器的標準輸出是否自動送進 Cloud Logging、需要哪些中繼資料設定（舊的容器啟動代理程式已於 2026-07-31 關閉）
 - [ ] Gemini 呼叫落在哪一種稽核紀錄、需不需要先開啟資料存取稽核紀錄
 - [ ] 「最新」模型別名在 Gemini Enterprise Agent Platform 上怎麼寫：`gemini-flash-latest` 這類別名官方文件主要列在 Gemini API（AI Studio）；Vertex AI 的自動更新別名則是不加版本號的模型名稱（例如 `gemini-2.5-flash`），只跟到同一代的最新穩定版，不會自動升到下一代。寫 Lab 前要確認哪一種能用、預設值填哪個
-  - 目前處理（lab-4）：實測 `gemini-flash-latest` 在 Agent Platform 回 404 `NOT_FOUND`。改成不寫死模型：程式用 `client.models.list()` 向平台查詢 Gemini 模型，只保留 `gemini-<版本>-flash` 與 `gemini-<版本>-flash-lite` 正式版，由舊到新排序，預設最後一個（最新）；使用者可在畫面選單換模型；`GEMINI_MODEL` 有設定時當預設模型。位置用 `global`。待實測：清單 API 是否列出可用的模型、是否列出已退役或專案無權使用的模型、`roles/aiplatform.user` 是否足以查詢清單
+  - 目前處理（lab-4）：實測 `gemini-flash-latest` 在 Agent Platform 回 404 `NOT_FOUND`。改成不寫死模型：程式用 `client.models.list()` 向平台查詢 Gemini 模型，只保留 `gemini-<版本>-flash` 與 `gemini-<版本>-flash-lite` 正式版，由舊到新排序，預設最後一個（最新）；使用者可在畫面選單換模型；`GEMINI_MODEL` 有設定時當預設模型。位置用 `global`。實測（2026-10-12）：`roles/aiplatform.user` 可以查詢清單，列出 gemini-2.5-flash-lite～gemini-3.8-flash，預設 gemini-3.8-flash 可正常回答。仍待確認：即將退役的模型（例如 gemini-2.5-flash）退役後是否還留在清單上
 - [ ] 自訂角色「小幫手值區」的四個權限是否足以自動建立值區並讀取 CSV，以及要授予在專案層級
 - [ ] 第 3 節各角色的正式名稱與 ID
 - [ ] 模型可觀察性資訊主頁的位置與 `aiplatform.googleapis.com/publisher/online_serving/` 指標的正式名稱、可篩選的標籤（例如模型名稱、回應代碼）
