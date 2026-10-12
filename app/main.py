@@ -8,6 +8,7 @@ API：
   GET  /healthz              健康檢查
   GET  /api/question         隨機取一題（不含答案）
   POST /api/answer           作答，回傳對錯與正確答案
+  GET  /api/models           可選的 Gemini 模型與預設模型（v2 起）
   POST /api/explain          問 AI 為什麼對或錯（v2 起，串流回傳 JSON）
   GET  /api/admin/csv-files  列出值區裡的 CSV
   POST /api/import           把值區裡的 CSV 匯入 Firestore（管理頁面手動觸發，或 Eventarc 自動觸發）
@@ -126,11 +127,31 @@ def post_answer(a: Answer):
 AI_LIMIT_PER_HOUR = 20   # 每個暱稱每小時最多問幾次（防濫用）
 
 
+def available_models() -> tuple[list[str], str]:
+    """回傳（可選的模型清單, 預設模型）。查不到清單時只剩環境變數 GEMINI_MODEL 指定的模型。"""
+    try:
+        models = list(ai.list_models())
+    except Exception as e:
+        log("ERROR", f"查詢 Gemini 模型清單失敗：{e}", event="ai_models", error=str(e))
+        models = []
+    if ai.DEFAULT_MODEL and ai.DEFAULT_MODEL not in models:
+        models.append(ai.DEFAULT_MODEL)
+    default = ai.DEFAULT_MODEL or (models[-1] if models else "")   # 沒指定就用最新的（最後一個）
+    return models, default
+
+
+@app.get("/api/models")
+def get_models():
+    models, default = available_models()
+    return {"models": models, "default": default}
+
+
 class ExplainRequest(BaseModel):
     nickname: str = Field(min_length=1, max_length=30)
     question_id: str
     choice: str = Field(description="學員選的選項，例如 B")
     grounded: bool = Field(True, description="是否把正確答案告訴 AI；false 是對照實驗")
+    model: str | None = Field(None, description="要用的模型（GET /api/models 清單中的一個）；不填就用預設模型")
 
 
 @app.post("/api/explain")
@@ -138,6 +159,13 @@ def explain(req: ExplainRequest):
     q = store.get_question(req.question_id)
     if q is None:
         raise HTTPException(404, "找不到這一題")
+
+    models, default = available_models()
+    model = req.model or default
+    if not model:
+        raise HTTPException(503, "找不到可用的 Gemini 模型，請管理者查看 ai_models 的 ERROR 紀錄")
+    if model not in models:
+        raise HTTPException(400, f"不支援的模型：{model}")
 
     nickname = req.nickname.strip()
     hour = datetime.now(timezone.utc).strftime("%Y%m%d%H")
@@ -147,14 +175,14 @@ def explain(req: ExplainRequest):
     choice = questions_csv.normalize_answer(req.choice)
     usage: dict = {}
     start = time.monotonic()
-    chunks = ai.stream_explanation(q, choice, req.grounded, usage)
+    chunks = ai.stream_explanation(q, choice, req.grounded, model, usage)
 
     # 先拿到第一段回應：逾時、超過配額（429）等錯誤會在這裡發生，直接回「AI 忙線中」
     try:
         first = next(chunks, "")
     except Exception as e:
         log("ERROR", f"問 AI 失敗：{e}", event="ai_explain", nickname=nickname,
-            question_id=req.question_id, model=ai.MODEL, error=str(e))
+            question_id=req.question_id, model=model, error=str(e))
         raise HTTPException(503, "AI 忙線中，請稍後再試（答題功能不受影響）")
 
     def body():
@@ -174,7 +202,7 @@ def explain(req: ExplainRequest):
                 question_id=req.question_id,
                 correct=choice == q["answer"],
                 grounded=req.grounded,
-                model=ai.MODEL,
+                model=model,
                 input_tokens=usage.get("input_tokens", 0),
                 output_tokens=usage.get("output_tokens", 0),
                 thinking_tokens=usage.get("thinking_tokens", 0),

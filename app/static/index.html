@@ -41,6 +41,7 @@
   <!-- v2 起：問 AI 為什麼對或錯 -->
   <section id="ai" class="card hidden">
     <button id="ask-ai">問 AI 為什麼</button>
+    <label class="muted">模型 <select id="ai-model"></select></label>
     <label class="muted"><input type="checkbox" id="ungrounded"> 對照實驗：不告訴 AI 正確答案</label>
     <pre id="ai-stream" class="muted hidden"></pre>
     <div id="ai-answer" class="hidden">
@@ -200,6 +201,7 @@ async function askAi() {
         question_id: current.question_id,
         choice: lastChoice,
         grounded: !$("ungrounded").checked,
+        model: $("ai-model").value || null,
       }),
     });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
@@ -235,7 +237,16 @@ async function askAi() {
   }
 }
 
+// 模型清單：由伺服器向平台查詢，預設選最新的一個；使用者可以自己換
+async function loadModels() {
+  try {
+    const { models, default: selected } = await api("/api/models");
+    for (const m of models) $("ai-model").append(new Option(m, m, false, m === selected));
+  } catch (e) { /* 查詢失敗：沒有選項，由伺服器用預設模型 */ }
+}
+
 $("ask-ai").onclick = askAi;
+loadModels();
 $("change-name").onclick = () => { show("quiz", false); show("result", false); show("nickname-box", true); };
 
 // 之前輸入過暱稱就直接開始

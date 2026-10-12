@@ -2,11 +2,13 @@
 
 呼叫的是 Gemini Enterprise Agent Platform（舊稱 Vertex AI）上的 Gemini 模型：
 - 不用 API 金鑰：用 Cloud Run 服務身分（服務帳戶 quiz-helper）驗證
-- 模型名稱放在環境變數 GEMINI_MODEL，換模型不用重建映像檔
+- 模型不寫死：向平台查詢可用的 Gemini 模型，由使用者在畫面上選；新模型上線不用改程式
 """
 
 import functools
 import os
+import re
+import time
 
 from google import genai
 from google.genai import types
@@ -14,10 +16,14 @@ from pydantic import BaseModel, Field
 
 from .config import project_id
 
-# 模型與位置都從環境變數讀取；改環境變數就能換模型，不用重建映像檔。
-# Agent Platform 要寫帶版本號的模型名稱（沒有 latest 別名），新版上線時改這個變數即可
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+# 模型不寫死在程式裡：啟動後向平台查詢有哪些 Gemini 模型，畫面上讓使用者自己選。
+# 預設選清單裡最新的一個；環境變數 GEMINI_MODEL 有設定時，改用它當預設（步驟 7 用來換模型）
+DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "")
 LOCATION = os.environ.get("GEMINI_LOCATION", "global")
+
+# 只列出一般用途的 Gemini Flash／Flash-Lite 正式版，例如 gemini-3.8-flash、gemini-3.5-flash-lite；
+# 名稱帶 preview（預覽版）、tts（語音）、image（圖片）等的特殊版本不列出
+MODEL_NAME = re.compile(r"^gemini-(\d+(?:\.\d+)*)-flash(-lite)?$")
 
 # 系統指示：設定 AI 的角色與回答規則，每次呼叫都一樣
 SYSTEM_INSTRUCTION = """你是 Google Cloud Associate Cloud Engineer（ACE）認證考試的助教。
@@ -51,6 +57,27 @@ def client() -> genai.Client:
     )
 
 
+def version_order(name: str) -> tuple:
+    """排序用：版本號小的在前；同版本時 Flash-Lite 在 Flash 前面。"""
+    m = MODEL_NAME.match(name)
+    return tuple(int(n) for n in m.group(1).split(".")), m.group(2) is None
+
+
+_models_cache = {"time": 0.0, "models": []}
+
+
+def list_models() -> list[str]:
+    """向 Agent Platform 查詢目前有哪些 Gemini 模型，由舊到新排序，最後一個就是最新的。
+
+    清單一小時查一次就好，存在記憶體裡。
+    """
+    if time.time() - _models_cache["time"] > 3600:
+        names = [m.name.rsplit("/", 1)[-1] for m in client().models.list()]   # publishers/google/models/<名稱>
+        models = sorted((n for n in names if MODEL_NAME.match(n)), key=version_order)
+        _models_cache.update(time=time.time(), models=models)
+    return _models_cache["models"]
+
+
 def build_prompt(q: dict, choice: str, grounded: bool) -> str:
     """組出要送給 Gemini 的題目內容。
 
@@ -72,13 +99,13 @@ def build_prompt(q: dict, choice: str, grounded: bool) -> str:
     return "\n".join(lines)
 
 
-def stream_explanation(q: dict, choice: str, grounded: bool, usage: dict):
-    """呼叫 Gemini，一段一段（串流）回傳 JSON 文字。
+def stream_explanation(q: dict, choice: str, grounded: bool, model: str, usage: dict):
+    """呼叫 Gemini（model 是模型名稱），一段一段（串流）回傳 JSON 文字。
 
     最後一段回應帶有 token 用量，寫進 usage，讓呼叫的地方寫紀錄。
     """
     chunks = client().models.generate_content_stream(
-        model=MODEL,
+        model=model,
         contents=build_prompt(q, choice, grounded),
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,

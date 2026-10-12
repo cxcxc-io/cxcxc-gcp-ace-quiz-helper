@@ -10,7 +10,7 @@ ACE 考點不是 AI 本身，而是這幾件事：**服務身分呼叫 API、不
 | 資源 | 名稱 | 在 Console 哪裡看 |
 | --- | --- | --- |
 | 映像檔 | `quiz-helper:v2` | Artifact Registry → `quiz-helper` 存放區 |
-| Cloud Run 修訂版 | 標記 `v2-flash`（模型 A）、標記 `v2-lite`（模型 B），各接一半流量 | Cloud Run → `quiz-helper` →「修訂版本」 |
+| Cloud Run 修訂版 | 標記 `v2-flash`（預設最新的 Flash）、標記 `v2-lite`（預設最新的 Flash-Lite），各接一半流量 | Cloud Run → `quiz-helper` →「修訂版本」 |
 | Firestore 集合 | `ai_quota`（每個暱稱每小時問 AI 的次數） | Firestore → 資料 |
 | 資料存取稽核紀錄 | Gemini Enterprise Agent Platform（舊稱 Vertex AI）的「資料讀取」 | IAM 與管理 → 稽核記錄 |
 
@@ -89,15 +89,11 @@ export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
 export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
 export IMAGE_V2=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v2
-export MODEL_A=gemini-3.8-flash
-export MODEL_B=gemini-3.5-flash-lite
 export RUN_URL=$(gcloud run services describe quiz-helper --region=${REGION} --format="value(status.url)")
 echo "專案：${PROJECT_ID}｜小幫手網址：${RUN_URL}"
 ```
 
 **預期看到的結果**：印出你的專案 ID 與 `https://quiz-helper-....run.app`。
-
-> `MODEL_A`、`MODEL_B` 是本段要比較的兩個模型：目前最新的 Gemini Flash 與 Flash-Lite。Gemini Enterprise Agent Platform 的模型名稱要帶版本號，沒有 Gemini API（AI Studio）那種 `gemini-flash-latest` 別名，寫成別名會得到 404 `NOT_FOUND`。Google 推出新版、或舊版退役時，到 Console「Gemini Enterprise Agent Platform」→「Model Garden」查目前的 Gemini Flash 模型名稱，換掉這兩個變數即可，不用改程式。
 
 ## 步驟 2：啟用 API，授予服務身分呼叫 Gemini 的角色
 
@@ -153,7 +149,8 @@ v2 加上了「問 AI 為什麼」。打開 `app/ai.py`，對照下面幾個重�
 
 | 程式裡的重點 | 畫面上看到什麼 |
 | --- | --- |
-| `MODEL = os.environ.get("GEMINI_MODEL", ...)`：模型名稱放在環境變數 | 步驟 7 換模型只改環境變數，不用重建映像檔 |
+| `list_models()`：向平台查詢目前有哪些 Gemini 模型，由舊到新排序 | 畫面上的「模型」選單，預設選最新的一個，可以自己換；Google 推出新模型不用改程式 |
+| `DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "")`：預設模型可以用環境變數指定 | 步驟 7 只改環境變數就換掉預設模型，不用重建映像檔 |
 | `SYSTEM_INSTRUCTION`：設定成「ACE 助教」、繁體中文、200 字內、點出考點 | 回答的語氣與長度一致 |
 | `build_prompt`：把正確答案一起送進去（`grounded=True`） | 步驟 8 對照：不給答案時，模型可能自己判斷錯 |
 | `response_schema=Explanation`：指定 JSON 格式（結論、關鍵觀念、各選項說明） | 回答分欄顯示，不是一大段文字 |
@@ -174,7 +171,7 @@ gcloud builds submit --tag ${IMAGE_V2} .
 **Console**：「Cloud Run」→ 點 `quiz-helper` →「編輯並部署新的修訂版本」
 
 - 容器映像檔網址：選 `quiz-helper:v2`
-- 「變數與密鑰」分頁 → 新增變數：名稱 `GEMINI_MODEL`，值 `gemini-3.8-flash`
+- 「變數與密鑰」分頁：不需要新增變數（沒有 `GEMINI_MODEL` 時，預設用最新的模型）
 - 取消勾選「**立即將這個修訂版本做為服務流量**」
 - 按「部署」，完成後到「修訂版本」分頁，在新修訂版的選單「管理修訂版本網址（標記）」加上標記 `v2-flash`
 
@@ -185,12 +182,14 @@ gcloud run deploy quiz-helper \
   --image=${IMAGE_V2} \
   --region=${REGION} \
   --service-account=${SA_EMAIL} \
-  --set-env-vars=GEMINI_MODEL=${MODEL_A} \
+  --remove-env-vars=GEMINI_MODEL \
   --no-traffic \
   --tag=v2-flash
 ```
 
 **預期看到的結果**：最後印出 `The revision can be reached directly at https://v2-flash---quiz-helper-....run.app`，並提示這個修訂版目前接 **0%** 流量。
+
+> `--remove-env-vars=GEMINI_MODEL`：不指定預設模型，讓程式自己選最新的。第一次做這一步時本來就沒有這個變數；重做這一步時，可以清掉步驟 7 設定的值。
 
 取得測試網址，確認兩個網址各是哪一版：
 
@@ -207,12 +206,26 @@ curl -s ${V2_URL}/api/question | grep -o '"version":"[^"]*"'
 
 **預期看到的結果**：正式網址回 `"version":"v1.1"`，測試網址回 `"version":"v2"`。
 
+看看 v2 查到哪些模型：
+
+```bash
+curl -s ${V2_URL}/api/models
+```
+
+**預期看到的結果**：類似 `{"models":["gemini-3.5-flash-lite",...,"gemini-3.8-flash"],"default":"gemini-3.8-flash"}`。`models` 是向平台查到的 Gemini Flash／Flash-Lite 模型，由舊到新排序；`default` 是最後一個，也就是最新的。實際的名稱依 Google 當時提供的模型而定。
+
+> 模型名稱不寫死在程式裡：Gemini Enterprise Agent Platform 的模型名稱都帶版本號（沒有 Gemini API 那種 `gemini-flash-latest` 別名），每個版本都有退役日期。小幫手改成每次啟動時向平台查詢，Google 推出新模型、舊模型退役，都不用改程式。
+
 用手機打開 **v2 測試網址**，答一題後按「**問 AI 為什麼**」：
+
+- 按鈕旁邊有「模型」選單，預設選最新的模型，也可以換成其他模型再問一次
 
 - 先看到 JSON 文字一段一段出現（串流），收完後變成「結論」「關鍵觀念」「各選項說明」分欄顯示
 - 回答是繁體中文、不長，會點出考點
 
-> 出現「AI 忙線中」：先等 1～2 分鐘讓步驟 2 的角色生效再試。還是不行，到 Logs Explorer 查 `jsonPayload.event="ai_explain"` 的 ERROR 紀錄看原因（例如模型名稱不存在，就依步驟 1 的說明換模型名稱）。
+> 出現「AI 忙線中」：先等 1～2 分鐘讓步驟 2 的角色生效再試；也可以在「模型」選單換一個模型試試。還是不行，到 Logs Explorer 查 `jsonPayload.event="ai_explain"` 的 ERROR 紀錄看原因。
+>
+> 「模型」選單是空的：查詢模型清單失敗，到 Logs Explorer 查 `jsonPayload.event="ai_models"` 的 ERROR 紀錄看原因。
 
 ## 步驟 6：流量分割，先導 10% 到 v2，再全部切過去
 
@@ -244,9 +257,20 @@ gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-f
 
 > 萬一 v2 有問題，一行指令就能把流量切回舊的修訂版（`--to-revisions=<舊修訂版名稱>=100`），不用重新部署。
 
-## 步驟 7：只改環境變數換模型，讓兩個模型各接一半流量
+## 步驟 7：只改環境變數換預設模型，讓兩個模型各接一半流量
 
-模型名稱放在環境變數 `GEMINI_MODEL`。換模型不用改程式、不用重建映像檔：用**同一個 v2 映像檔**，只改環境變數部署一個新修訂版，Cloud Run 會自動產生新的修訂版。
+大部分使用者不會去動「模型」選單，用的就是預設模型。預設模型可以用環境變數 `GEMINI_MODEL` 指定：用**同一個 v2 映像檔**，只改環境變數部署一個新修訂版，Cloud Run 會自動產生新的修訂版，不用改程式、不用重建映像檔。
+
+先從 v2 查到的清單挑出最新的 Flash-Lite（比 Flash 便宜、快，但回答可能比較簡略）當模型 B：
+
+```bash
+export MODEL_B=$(curl -s ${V2_URL}/api/models | python3 -c "import json,sys; print([m for m in json.load(sys.stdin)['models'] if m.endswith('-lite')][-1])")
+echo "模型 B：${MODEL_B}"
+```
+
+**預期看到的結果**：印出一個以 `-flash-lite` 結尾的模型名稱，例如 `gemini-3.5-flash-lite`。
+
+部署模型 B 的修訂版：
 
 ```bash
 gcloud run deploy quiz-helper \
@@ -259,17 +283,19 @@ gcloud run deploy quiz-helper \
 
 **預期看到的結果**：產生新的修訂版（例如 `quiz-helper-00004-...`），標記 `v2-lite`，流量 0%。
 
+**Console**：「Cloud Run」→ 點 `quiz-helper` →「編輯並部署新的修訂版本」→「變數與密鑰」分頁新增變數 `GEMINI_MODEL`，值填上面印出的模型 B →取消勾選「立即將這個修訂版本做為服務流量」→「部署」，再到「修訂版本」分頁幫新修訂版加上標記 `v2-lite`。
+
 讓兩個模型各接一半流量：
 
 ```bash
 gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-flash=50,v2-lite=50
 ```
 
-**預期看到的結果**：`v2-flash`（模型 A）與 `v2-lite`（模型 B）兩個修訂版各 50%。
+**預期看到的結果**：`v2-flash`（預設最新的 Flash）與 `v2-lite`（預設模型 B）兩個修訂版各 50%。
 
-用手機在正式網址多問幾次 AI，題目下方的「這一題由 Cloud Run「quiz-helper-0000x-…」回應」會在兩個修訂版之間變換。比較兩個模型：回答速度、內容詳細程度有沒有差別？
+用手機在正式網址重新整理幾次，題目下方的「這一題由 Cloud Run「quiz-helper-0000x-…」回應」會在兩個修訂版之間變換，「模型」選單的預設值也跟著變。不動選單、直接問幾次 AI，比較兩個模型：回答速度、內容詳細程度有沒有差別？
 
-> **為什麼模型名稱放在環境變數**：Agent Platform 的模型名稱帶版本號，每個版本都有退役日期。名稱放在環境變數 `GEMINI_MODEL`，換新版只要部署一個新修訂版（像本步驟這樣），先切一部分流量試，回答品質沒問題再全部切過去，不用改程式、不用重建映像檔。
+> **正式產品怎麼換模型**：讓使用者自己選模型方便課堂比較；正式產品通常由營運者用 `GEMINI_MODEL` 固定預設模型，新模型上線時像本步驟這樣部署一個新修訂版，先切一部分流量試，回答品質沒問題再全部切過去。
 
 ## 步驟 8：對照實驗——不給 AI 正確答案
 
@@ -304,7 +330,7 @@ gcloud logging read \
   --format="table(timestamp, jsonPayload.model, jsonPayload.input_tokens, jsonPayload.output_tokens, jsonPayload.latency_ms)"
 ```
 
-**預期看到的結果**：一個表格，兩個模型的紀錄都有，可以比較 token 數與回應時間。
+**預期看到的結果**：一個表格，`model` 欄位是每次實際使用的模型（預設的、或使用者在選單換的），可以比較不同模型的 token 數與回應時間。
 
 2. **資料存取稽核紀錄**：Google Cloud 平台記下「哪個身分呼叫了 Gemini」。
 
@@ -338,8 +364,9 @@ gcloud logging read \
 
 - [ ] 服務帳戶 `quiz-helper` 有 `roles/aiplatform.user`，程式與環境變數裡沒有任何 API 金鑰
 - [ ] 用 `--no-traffic` 與標記 `v2-flash` 部署，測試網址能問 AI，正式網址仍是 v1.1
+- [ ] `/api/models` 列出平台上的 Gemini 模型，畫面的「模型」選單預設選最新的一個，換模型也能問
 - [ ] 流量分割 10% → 100%，`/api/question` 看得到版本比例變化
-- [ ] 只改環境變數就部署出模型 B 的修訂版，兩個模型各接 50%
+- [ ] 只改環境變數 `GEMINI_MODEL` 就部署出預設模型 B 的修訂版，兩個修訂版各接 50%
 - [ ] 勾選對照實驗，比較有沒有給答案的差別
 - [ ] Logs Explorer 看得到 `ai_explain` 紀錄的 token 數，稽核紀錄看得到 `quiz-helper` 呼叫 Gemini
 
