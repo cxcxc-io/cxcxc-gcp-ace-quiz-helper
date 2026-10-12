@@ -10,7 +10,7 @@ ACE 考點不是 AI 本身，而是這幾件事：**服務身分呼叫 API、不
 | 資源 | 名稱 | 在 Console 哪裡看 |
 | --- | --- | --- |
 | 映像檔 | `quiz-helper:v2` | Artifact Registry → `quiz-helper` 存放區 |
-| Cloud Run 修訂版 | 標記 `v2`（模型 A）、標記 `lite`（模型 B），各接一半流量 | Cloud Run → `quiz-helper` →「修訂版本」 |
+| Cloud Run 修訂版 | 標記 `v2-flash`（模型 A）、標記 `v2-lite`（模型 B），各接一半流量 | Cloud Run → `quiz-helper` →「修訂版本」 |
 | Firestore 集合 | `ai_quota`（每個暱稱每小時問 AI 的次數） | Firestore → 資料 |
 | 資料存取稽核紀錄 | Gemini Enterprise Agent Platform（舊稱 Vertex AI）的「資料讀取」 | IAM 與管理 → 稽核記錄 |
 
@@ -169,14 +169,14 @@ gcloud builds submit --tag ${IMAGE_V2} .
 
 ## 步驟 5：部署 v2，但先不導流量，用測試網址自己試
 
-直接上線有風險。先部署 v2 但**不導任何流量**（`--no-traffic`），加上**標記（tag）** `v2`：Cloud Run 會給這個修訂版一個專屬的測試網址，只有知道網址的人會用到它，一般學員還是用 v1.1。
+直接上線有風險。先部署 v2 但**不導任何流量**（`--no-traffic`），加上**標記（tag）** `v2-flash`（標記至少要 3 個字元）：Cloud Run 會給這個修訂版一個專屬的測試網址，只有知道網址的人會用到它，一般學員還是用 v1.1。
 
 **Console**：「Cloud Run」→ 點 `quiz-helper` →「編輯並部署新的修訂版本」
 
 - 容器映像檔網址：選 `quiz-helper:v2`
 - 「變數與密鑰」分頁 → 新增變數：名稱 `GEMINI_MODEL`，值 `gemini-flash-latest`
 - 取消勾選「**立即將這個修訂版本做為服務流量**」
-- 按「部署」，完成後到「修訂版本」分頁，在新修訂版的選單「管理修訂版本網址（標記）」加上標記 `v2`
+- 按「部署」，完成後到「修訂版本」分頁，在新修訂版的選單「管理修訂版本網址（標記）」加上標記 `v2-flash`
 
 **gcloud**：
 
@@ -187,16 +187,16 @@ gcloud run deploy quiz-helper \
   --service-account=${SA_EMAIL} \
   --set-env-vars=GEMINI_MODEL=${MODEL_A} \
   --no-traffic \
-  --tag=v2
+  --tag=v2-flash
 ```
 
-**預期看到的結果**：最後印出 `The revision can be reached directly at https://v2---quiz-helper-....run.app`，並提示這個修訂版目前接 **0%** 流量。
+**預期看到的結果**：最後印出 `The revision can be reached directly at https://v2-flash---quiz-helper-....run.app`，並提示這個修訂版目前接 **0%** 流量。
 
 取得測試網址，確認兩個網址各是哪一版：
 
 ```bash
 export V2_URL=$(gcloud run services describe quiz-helper --region=${REGION} \
-  --format=json | python3 -c "import json,sys; print([t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag')=='v2'][0])")
+  --format=json | python3 -c "import json,sys; print([t['url'] for t in json.load(sys.stdin)['status']['traffic'] if t.get('tag')=='v2-flash'][0])")
 echo "正式網址：${RUN_URL}"
 echo "v2 測試網址：${V2_URL}"
 curl -s ${RUN_URL}/healthz; echo
@@ -217,10 +217,10 @@ curl -s ${V2_URL}/healthz; echo
 1. 先讓 10% 的流量到 v2：
 
 ```bash
-gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2=10
+gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-flash=10
 ```
 
-**預期看到的結果**：印出流量分配，v2 標記的修訂版 10%、原本的修訂版 90%。
+**預期看到的結果**：印出流量分配，`v2-flash` 標記的修訂版 10%、原本的修訂版 90%。
 
 連續問 20 次正式網址，數一數各版本出現幾次：
 
@@ -235,10 +235,10 @@ for i in $(seq 20); do curl -s ${RUN_URL}/healthz | grep -o '"version":"[^"]*"';
 2. 確認沒問題，全部切到 v2：
 
 ```bash
-gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2=100
+gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-flash=100
 ```
 
-**預期看到的結果**：v2 的修訂版 100%。手機打開正式網址，版本變成 `v2`，也有「問 AI 為什麼」按鈕。
+**預期看到的結果**：`v2-flash` 的修訂版 100%。手機打開正式網址，版本變成 `v2`，也有「問 AI 為什麼」按鈕。
 
 > 萬一 v2 有問題，一行指令就能把流量切回舊的修訂版（`--to-revisions=<舊修訂版名稱>=100`），不用重新部署。
 
@@ -252,18 +252,18 @@ gcloud run deploy quiz-helper \
   --region=${REGION} \
   --update-env-vars=GEMINI_MODEL=${MODEL_B} \
   --no-traffic \
-  --tag=lite
+  --tag=v2-lite
 ```
 
-**預期看到的結果**：產生新的修訂版（例如 `quiz-helper-00004-...`），標記 `lite`，流量 0%。
+**預期看到的結果**：產生新的修訂版（例如 `quiz-helper-00004-...`），標記 `v2-lite`，流量 0%。
 
 讓兩個模型各接一半流量：
 
 ```bash
-gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2=50,lite=50
+gcloud run services update-traffic quiz-helper --region=${REGION} --to-tags=v2-flash=50,v2-lite=50
 ```
 
-**預期看到的結果**：`v2`（模型 A）與 `lite`（模型 B）兩個修訂版各 50%。
+**預期看到的結果**：`v2-flash`（模型 A）與 `v2-lite`（模型 B）兩個修訂版各 50%。
 
 用手機在正式網址多問幾次 AI，題目下方的「這一題由 Cloud Run「quiz-helper-0000x-…」回應」會在兩個修訂版之間變換。比較兩個模型：回答速度、內容詳細程度有沒有差別？
 
@@ -335,7 +335,7 @@ gcloud logging read \
 ## 本段檢查清單
 
 - [ ] 服務帳戶 `quiz-helper` 有 `roles/aiplatform.user`，程式與環境變數裡沒有任何 API 金鑰
-- [ ] 用 `--no-traffic` 與標記 `v2` 部署，測試網址能問 AI，正式網址仍是 v1.1
+- [ ] 用 `--no-traffic` 與標記 `v2-flash` 部署，測試網址能問 AI，正式網址仍是 v1.1
 - [ ] 流量分割 10% → 100%，`/healthz` 看得到版本比例變化
 - [ ] 只改環境變數就部署出模型 B 的修訂版，兩個模型各接 50%
 - [ ] 勾選對照實驗，比較有沒有給答案的差別
