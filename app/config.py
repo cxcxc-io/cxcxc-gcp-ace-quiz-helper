@@ -2,6 +2,8 @@
 
 import functools
 import os
+import socket
+import urllib.request
 
 import google.auth
 
@@ -25,6 +27,32 @@ def project_id() -> str:
     if not project:
         raise RuntimeError("取得不到專案 ID：請確認程式在 GCP 上執行，或設定 GOOGLE_CLOUD_PROJECT")
     return project
+
+
+@functools.cache
+def runtime() -> dict:
+    """v1.1 起：回傳「現在是哪個平台、哪一個執行個體在回應」，顯示在畫面與 /healthz。
+
+    - GKE：Pod 名稱（就是容器的主機名稱），增加或刪除 Pod 時看得到名稱變化
+    - Cloud Run：修訂版名稱＋執行個體 ID 前 8 碼（從中繼資料伺服器取得）
+    - VM：容器 ID（docker 容器的主機名稱）
+    """
+    if os.environ.get("K_SERVICE"):   # Cloud Run 會自動設定 K_SERVICE、K_REVISION
+        instance_id = ""
+        try:
+            request = urllib.request.Request(
+                "http://metadata.google.internal/computeMetadata/v1/instance/id",
+                headers={"Metadata-Flavor": "Google"},
+            )
+            with urllib.request.urlopen(request, timeout=2) as response:
+                instance_id = response.read().decode()[:8]
+        except OSError:
+            pass
+        name = os.environ.get("K_REVISION", "")
+        return {"platform": "Cloud Run", "instance": f"{name} / {instance_id}" if instance_id else name}
+    if os.environ.get("KUBERNETES_SERVICE_HOST"):   # GKE（Kubernetes）會自動設定
+        return {"platform": "GKE", "instance": socket.gethostname()}
+    return {"platform": "VM", "instance": socket.gethostname()}
 
 
 @functools.cache

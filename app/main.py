@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import bucket, questions_csv, store
-from .config import APP_VERSION, bucket_name
+from .config import APP_VERSION, bucket_name, runtime
 from .logs import log
 
 STATIC = Path(__file__).parent / "static"
@@ -57,7 +57,8 @@ def admin():
 
 @app.get("/healthz")
 def healthz():
-    return {"status": "ok", "version": APP_VERSION}
+    # v1.1 起多回傳平台與執行個體名稱，方便觀察流量分給了哪個 Pod／執行個體
+    return {"status": "ok", "version": APP_VERSION, **runtime()}
 
 
 # ---------- 答題 ----------
@@ -77,6 +78,7 @@ def get_question():
         "domain": q.get("domain", ""),      # v1.1 起：畫面顯示題目的主題
         "services": q.get("services", ""),  # v1.1 起：畫面顯示相關服務
         "version": APP_VERSION,
+        **runtime(),                         # v1.1 起：platform、instance
     }
 
 

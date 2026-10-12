@@ -219,8 +219,8 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 
 - 建立 Autopilot 叢集，用 Workload Identity Federation for GKE 把角色直接授予 Kubernetes 服務帳戶，讓 Pod 取得同樣的權限（扮演 IAM 服務帳戶的做法放在最後當替代做法）
 - 部署 Deployment 與 Service，取得對外 IP
-- 用 `kubectl scale` 增加 Pod，刪掉一個 Pod 看它自動補回來（不做 HPA 與壓測：體感不明顯，也不容易穩定觸發）
-- 推出 v1.1（例如畫面顯示主題），觀察滾動更新不中斷服務
+- 用 `kubectl scale` 增加 Pod，刪掉一個 Pod 看它自動補回來；從畫面與 `/healthz` 的 Pod 名稱看出變化（不做 HPA 與壓測：體感不明顯，也不容易穩定觸發）
+- 推出 v1.1（畫面顯示題目主題，以及「由哪個平台、哪一個執行個體回應」：GKE 顯示 Pod 名稱、Cloud Run 顯示修訂版與執行個體 ID、VM 顯示容器 ID），觀察滾動更新不中斷服務
 - Logging：用 `jsonPayload.correct=false` 篩出答錯的紀錄；`resource.type` 變成 `k8s_container`
 - 痛點：沒人上課時叢集照樣計費
 - 對應章節：GKE

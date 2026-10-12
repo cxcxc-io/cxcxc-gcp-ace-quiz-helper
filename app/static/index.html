@@ -29,6 +29,7 @@
     <div id="options"></div>
     <button id="submit">送出答案</button>
     <button id="next" class="hidden">下一題</button>
+    <p id="served-by" class="muted hidden"></p>
   </section>
 
   <section id="result" class="card hidden">
@@ -73,6 +74,10 @@ async function nextQuestion() {
     return;
   }
   $("version").textContent = current.version;
+
+  // v1.1 起：顯示這一題是哪個平台、哪一個執行個體回應的（GKE 是 Pod 名稱）
+  $("served-by").textContent = current.instance ? `這一題由 ${current.platform}「${current.instance}」回應` : "";
+  show("served-by", !!current.instance);
   $("qid").textContent = current.question_id;
   $("question-cn").textContent = current.question_cn;
   $("question-en").textContent = current.question_en;

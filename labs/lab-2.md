@@ -278,46 +278,12 @@ curl -s http://${LB_IP}/healthz
 
 **Console**：導覽選單 →「Kubernetes Engine」→「工作負載」，看到 `quiz-helper`，狀態「正常」，Pod 數 2/2。
 
-## 步驟 8：增加 Pod、刪掉 Pod，看 Kubernetes 怎麼處理
+## 步驟 8：推出 v1.1，觀察滾動更新不中斷服務
 
-1. **一個指令就能加 Pod**：把 Pod 從 2 個增加到 4 個。
+v1.1 多了兩樣東西：
 
-```bash
-kubectl scale deployment quiz-helper --replicas=4
-kubectl get pods
-```
-
-**預期看到的結果**：`deployment.apps/quiz-helper scaled`；`kubectl get pods` 多出兩個新的 Pod，狀態從 `Pending`、`ContainerCreating` 變成 `Running`（Autopilot 可能要先準備節點，需要一兩分鐘，重複執行 `kubectl get pods` 觀察）。
-
-**Console**：「Kubernetes Engine」→「工作負載」→ 點 `quiz-helper`，「代管 Pod」區塊也會看到 4 個 Pod。
-
-2. **Pod 掛了會自己補回來**：在 Cloud Shell 開**第二個分頁**（終端機上方的「+」），持續觀察 Pod：
-
-```bash
-kubectl get pods --watch
-```
-
-回到第一個分頁，隨便刪掉一個 Pod（模擬它當機）：
-
-```bash
-kubectl delete pod $(kubectl get pods -l app=quiz-helper -o jsonpath='{.items[0].metadata.name}')
-```
-
-**預期看到的結果**：第二個分頁看到被刪的 Pod 變成 `Terminating`，同時馬上出現一個新的 Pod，從 `Pending` 變成 `Running`。Deployment 會一直維持你指定的 4 個 Pod。這段期間用手機重新整理小幫手，照樣可以答題。
-
-> 這就是 Lab 1 VM 做不到的事：VM 停了服務就中斷；Deployment 裡的 Pod 掛了，Kubernetes 會自動補一個新的，其他 Pod 繼續服務。
-
-3. 縮回 2 個 Pod，第二個分頁按 Ctrl+C 停止觀察：
-
-```bash
-kubectl scale deployment quiz-helper --replicas=2
-```
-
-**預期看到的結果**：多出來的兩個 Pod 變成 `Terminating` 後消失，剩下 2 個 `Running`。
-
-## 步驟 9：推出 v1.1，觀察滾動更新不中斷服務
-
-v1.1 在題目上方多顯示一個標籤：題目的「主題」與「相關服務」（來自題庫的 `question_domain_attribute`、`question_servcie_attribute` 欄位）。
+- 題目上方的標籤：題目的「主題」與「相關服務」（來自題庫的 `question_domain_attribute`、`question_servcie_attribute` 欄位）
+- 題目下方的「這一題由 GKE「Pod 名稱」回應」，`/healthz` 也會回傳 `platform` 與 `instance`：**看得到是哪一個 Pod 在回應你**，下一步增加、刪除 Pod 時就看得出變化
 
 1. 用 Cloud Build 建置 v1.1（Lab 2 的程式碼就是 v1.1，`Dockerfile` 已把版本設為 `v1.1`）：
 
@@ -327,12 +293,14 @@ gcloud builds submit --tag ${IMAGE_V11} .
 
 **預期看到的結果**：最後的表格 `STATUS` 是 `SUCCESS`，`IMAGES` 是 `...quiz-helper:v1.1`。
 
-2. 在**第二個分頁**每 0.5 秒查一次版本，觀察更新過程（`PROJECT_ID` 等變數在新分頁不存在，所以這裡重新取得 IP）：
+2. 在 Cloud Shell 開**第二個分頁**（終端機上方的「+」），每 0.5 秒問一次小幫手「你是哪一版、哪一個 Pod」。這個分頁先不要關，下一步還會用到：
 
 ```bash
 LB_IP=$(kubectl get service quiz-helper -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 while true; do echo "$(date +%T) $(curl -s -m 2 http://${LB_IP}/healthz || echo '連線失敗')"; sleep 0.5; done
 ```
+
+> 新分頁沒有第一個分頁設定的變數，所以這裡重新取得負載平衡器的 IP。
 
 3. 回到第一個分頁，把 Deployment 的映像檔換成 v1.1：
 
@@ -344,12 +312,54 @@ kubectl rollout status deployment/quiz-helper
 **預期看到的結果**：
 
 - 第一個分頁最後印出 `deployment "quiz-helper" successfully rolled out`
-- 第二個分頁先全是 `"version":"v1"`，接著 `v1` 和 `v1.1` 交錯出現，最後全是 `"version":"v1.1"`，**整個過程沒有出現「連線失敗」**
-- 手機重新整理小幫手，題目上方出現「主題：…｜相關服務：…」的標籤，頁面右上角版本變成 `v1.1`
-
-第二個分頁按 Ctrl+C 停止。
+- 第二個分頁先全是 `{"status":"ok","version":"v1"}`，接著 v1 和 v1.1 交錯出現，最後全是類似 `{"status":"ok","version":"v1.1","platform":"GKE","instance":"quiz-helper-7c9d8f6b5-x2k4p"}` 的回應，**整個過程沒有出現「連線失敗」**
+- v1.1 的回應會在 2 個不同的 Pod 名稱之間交替：負載平衡器把流量分給兩個 Pod
+- 手機重新整理小幫手，題目上方出現「主題：…｜相關服務：…」標籤，題目下方出現「這一題由 GKE「quiz-helper-…」回應」，頁面右上角版本變成 `v1.1`
 
 > 為什麼不中斷？`deployment.yaml` 的滾動更新設定是「先多開一個新版 Pod（`maxSurge: 1`），等它通過健康檢查（`readinessProbe`）才關掉一個舊版（`maxUnavailable: 0`）」，任何時候都有可以服務的 Pod。
+
+## 步驟 9：增加 Pod、刪掉 Pod，看 Kubernetes 怎麼處理
+
+第二個分頁的迴圈繼續開著，觀察回應的 Pod 名稱怎麼變化。
+
+1. **一個指令就能加 Pod**：把 Pod 從 2 個增加到 4 個。
+
+```bash
+kubectl scale deployment quiz-helper --replicas=4
+kubectl get pods
+```
+
+**預期看到的結果**：
+
+- `deployment.apps/quiz-helper scaled`；`kubectl get pods` 多出兩個新的 Pod，狀態從 `Pending`、`ContainerCreating` 變成 `Running`（Autopilot 可能要先準備節點，需要一兩分鐘，重複執行 `kubectl get pods` 觀察）
+- 新的 Pod 變成 `Running` 後，第二個分頁的 `instance` 從 2 個名稱變成在 **4 個**名稱之間交替
+- 手機多重新整理幾次，「這一題由…回應」的 Pod 名稱也可能換成新的（瀏覽器會沿用連線，不一定每次都換）
+
+**Console**：「Kubernetes Engine」→「工作負載」→ 點 `quiz-helper`，「代管 Pod」區塊看到 4 個 Pod。
+
+2. **Pod 掛了會自己補回來**：刪掉一個 Pod（模擬它當機），先記下它的名稱：
+
+```bash
+export VICTIM=$(kubectl get pods -l app=quiz-helper -o jsonpath='{.items[0].metadata.name}')
+echo "要刪除的 Pod：${VICTIM}"
+kubectl delete pod ${VICTIM}
+kubectl get pods
+```
+
+**預期看到的結果**：
+
+- `kubectl get pods` 裡，被刪的 Pod 不見了（或顯示 `Terminating`），同時多了一個名稱沒看過的新 Pod，從 `Pending` 變成 `Running`；Deployment 一直維持 4 個 Pod
+- 第二個分頁裡，被刪的 Pod 名稱**不再出現**，幾十秒後出現新 Pod 的名稱；**整個過程沒有出現「連線失敗」**
+
+> 這就是 Lab 1 VM 做不到的事：VM 停了服務就中斷；Deployment 裡的 Pod 掛了，負載平衡器會把流量交給其他 Pod，Kubernetes 再自動補一個新的。
+
+3. 縮回 2 個 Pod：
+
+```bash
+kubectl scale deployment quiz-helper --replicas=2
+```
+
+**預期看到的結果**：多出來的兩個 Pod 變成 `Terminating` 後消失；第二個分頁的 `instance` 回到只在 2 個名稱之間交替。第二個分頁按 Ctrl+C 停止。
 
 ## 步驟 10：用結構化欄位篩選紀錄
 
@@ -438,8 +448,8 @@ kubectl rollout status deployment/quiz-helper
 - [ ] Autopilot 叢集 `quiz-helper-cluster` 建立完成
 - [ ] Kubernetes 服務帳戶 `quiz-helper` 直接被授予兩個角色，Pod 能讀 Firestore、列出值區
 - [ ] 手機打得開 `http://<EXTERNAL-IP>`
-- [ ] `kubectl scale` 把 Pod 增加到 4 個；刪掉一個 Pod 後自動補回來
-- [ ] 換成 v1.1 時服務沒有中斷，畫面出現主題標籤
+- [ ] 換成 v1.1 時服務沒有中斷，畫面出現主題標籤與 Pod 名稱
+- [ ] `kubectl scale` 把 Pod 增加到 4 個；刪掉一個 Pod 後自動補回來，`/healthz` 看得到 Pod 名稱的變化
 - [ ] Logs Explorer 用 `resource.type="k8s_container"` 與 `jsonPayload.correct=false` 篩出答錯的紀錄
 
 ## 清理
