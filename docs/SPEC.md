@@ -228,7 +228,7 @@ LLM 應用上線後，最常被問的兩個問題是「花了多少 token」和�
 ### 階段 3：Cloud Run
 
 - 同一個 v1.1 映像檔部署成 Cloud Run 服務，指定服務身分，開放未驗證存取
-- 用 `/healthz` 回報的執行個體 ID 觀察擴充：同時送一批請求，把並行數（concurrency）改成 1 後看到執行個體變多；閒置後看縮到零與冷啟動（不使用壓測腳本）
+- 說明自動擴充與縮到零（在 Console 指標頁看執行個體數量），不實作高併發或壓測
 - Logging：把「答錯次數」做成紀錄型指標，設一個警示政策；`resource.type` 變成 `cloud_run_revision`
 - 對應章節：Cloud Run、Serverless 架構、Cloud Monitoring
 
@@ -330,7 +330,7 @@ labs/               每個階段的步驟說明與 gcloud 指令
 
 ### 壓測腳本
 
-- 階段 2、3 不使用壓測腳本：擴充的體感不明顯，也不容易穩定觸發。改用畫面與 `/healthz` 顯示的執行個體名稱，搭配 `kubectl scale`、刪除 Pod、Cloud Run 並行數設定，讓變化看得見
+- 階段 2、3 不使用壓測腳本：擴充的體感不明顯，也不容易穩定觸發。改用畫面與 `/healthz` 顯示的執行個體名稱，搭配 `kubectl scale`、刪除 Pod，讓變化看得見；Cloud Run 不實作高併發
 - 階段 5 另有小量的問 AI 壓測（例如全班各問 10 次），讓 LLM 指標有資料
 
 ### 費用控管

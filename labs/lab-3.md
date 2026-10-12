@@ -151,54 +151,9 @@ curl -s ${RUN_URL}/healthz
 用手機打開 `RUN_URL`（這次是 `https://`），答幾題：題庫沿用 Lab 1 匯入 Firestore 的題目，題目下方顯示「這一題由 Cloud Run「quiz-helper-00001-… / …」回應」。**用補進度腳本的學員**，請先打開 `${RUN_URL}/admin` 按 `questions.csv` 的「匯入」。
 
 > 比較 Lab 1、Lab 2：不用開防火牆、不用建負載平衡器，Cloud Run 直接給一個 HTTPS 網址。
+> Cloud Run 會依請求量自動增減執行個體；沒有流量時，閒置的執行個體大約 15 分鐘後被關掉，**縮到零、不計費**。可以在「Cloud Run」→ 點 `quiz-helper` →「指標」分頁 →「容器執行個體數量」看到數量變化。GKE 的 Deployment 則會一直保留你指定的 Pod 數。
 
-## 步驟 4：看執行個體自動增加，認識「並行（concurrency）」
-
-Cloud Run 依請求量自動增減執行個體。每個執行個體同時能處理幾個請求，由**並行（concurrency）**設定決定（預設 80）。小幫手的 `/healthz` 會回報是哪一個執行個體回應，所以同時送一批請求，就能數出有幾個執行個體在工作。
-
-1. 用預設的並行數，同時送 40 個請求（每次 10 個一起送），數一數是哪些執行個體回應：
-
-```bash
-seq 40 | xargs -P 10 -I{} curl -s ${RUN_URL}/healthz | grep -o '"instance":"[^"]*"' | sort | uniq -c
-```
-
-**預期看到的結果**：通常只有 **1～2 行**：一個執行個體同時能處理 80 個請求，10 個一起送綽綽有餘。
-
-2. 把並行數改成 1（每個執行個體一次只處理一個請求），再送一次：
-
-```bash
-gcloud run services update quiz-helper --region=${REGION} --concurrency=1
-seq 40 | xargs -P 10 -I{} curl -s ${RUN_URL}/healthz | grep -o '"instance":"[^"]*"' | sort | uniq -c
-```
-
-**預期看到的結果**：
-
-- `update` 產生新的修訂版（`quiz-helper-00002-…`），流量自動切到新修訂版
-- 這次列出**好幾行**（通常 5 行以上），每一行是一個不同的執行個體 ID：同時有 10 個請求，一個執行個體一次只接一個，Cloud Run 只好開更多執行個體
-
-**Console**：「Cloud Run」→ 點 `quiz-helper` →「指標」分頁 →「容器執行個體數量」，可以看到剛才執行個體數量上升。
-
-3. 改回預設值：
-
-```bash
-gcloud run services update quiz-helper --region=${REGION} --concurrency=80
-```
-
-4. **縮到零**：Cloud Run 沒有流量時，閒置的執行個體大約 15 分鐘後會被關掉，執行個體數量降到 0，**不再計費**。下課休息後回來再看：
-
-- Console「指標」→「容器執行個體數量」降到 0
-- 這時再呼叫一次，會開出一個新的執行個體（冷啟動），第一個請求比較慢：
-
-  ```bash
-  curl -s -o /dev/null -w "花了 %{time_total} 秒\n" ${RUN_URL}/healthz
-  curl -s -o /dev/null -w "花了 %{time_total} 秒\n" ${RUN_URL}/healthz
-  ```
-
-  第一次通常要 1～數秒，第二次只要零點幾秒。
-
-> 比較 Lab 2：GKE 的 Deployment 至少保留你指定的 Pod 數，沒人用也照樣計費；Cloud Run 預設可以縮到零。
-
-## 步驟 5：把「答錯次數」做成紀錄型指標
+## 步驟 4：把「答錯次數」做成紀錄型指標
 
 每次作答，小幫手都會寫一筆 `jsonPayload.event="answer"` 的紀錄。**紀錄型指標（log-based metric）**會計算符合篩選條件的紀錄數量，變成可以畫圖、設警示的指標。
 
@@ -240,7 +195,7 @@ gcloud logging metrics list --filter="name=quiz_helper_wrong_answers"
 
 > 紀錄型指標**只從建立之後開始計算**，建立之前的答錯紀錄不會算進去。
 
-## 步驟 6：設定警示政策，答錯太多就寄信
+## 步驟 5：設定警示政策，答錯太多就寄信
 
 設定：**1 分鐘內答錯超過 5 次**，就寄電子郵件通知你。
 
@@ -293,11 +248,12 @@ echo "已送出 10 個錯誤答案"
 
 沒有新的答錯紀錄後，事件會自動關閉（政策設定 30 分鐘後自動關閉）。
 
-> 紀錄型指標從寫入紀錄到出現在 Monitoring，會有幾分鐘延遲。超過 10 分鐘還沒收到信，先確認步驟 5 的指標在 Metrics Explorer 有資料。
+> 紀錄型指標從寫入紀錄到出現在 Monitoring，會有幾分鐘延遲。超過 10 分鐘還沒收到信，先確認步驟 4 的指標在 Metrics Explorer 有資料。
 
 ## 想一想
 
 - **部署變簡單了**：沒有 VM、沒有叢集、沒有防火牆和負載平衡器，`gcloud run deploy` 一行就有 HTTPS 網址
+- **沒人用就不花錢**：沒有流量時縮到零
 - **看得見異常**：答錯次數變成指標，超過門檻就通知
 
 Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
@@ -307,7 +263,6 @@ Lab 4 會在 Cloud Run 上推出 v2，加上「問 AI 為什麼對或錯」。
 ## 本段檢查清單
 
 - [ ] Cloud Run 服務 `quiz-helper` 使用服務帳戶 `quiz-helper`，手機打得開
-- [ ] 並行數改成 1 時，`/healthz` 數得到好幾個執行個體
 - [ ] Logs Explorer 用 `resource.type="cloud_run_revision"` 找得到答題紀錄
 - [ ] 紀錄型指標 `quiz_helper_wrong_answers` 建立完成
 - [ ] 送出錯誤答案後收到警示通知信
