@@ -9,13 +9,13 @@ API：
   GET  /api/question         隨機取一題（不含答案）
   POST /api/answer           作答，回傳對錯與正確答案
   GET  /api/admin/csv-files  列出值區裡的 CSV
-  POST /api/import           把值區裡的 CSV 匯入 Firestore
+  POST /api/import           把值區裡的 CSV 匯入 Firestore（管理頁面手動觸發，或 Eventarc 自動觸發）
 """
 
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -126,33 +126,76 @@ def csv_files():
 
 
 class ImportRequest(BaseModel):
-    object: str = Field(min_length=1, description="值區裡的 CSV 檔名，例如 questions.csv")
+    # 管理頁面手動匯入時送 {"object": "questions.csv"}
+    object: str | None = Field(None, description="值區裡的 CSV 檔名，例如 questions.csv")
+    # Eventarc 送來的 CloudEvent（Cloud Storage 有新檔案）內容裡有 name 與 bucket
+    name: str | None = Field(None, description="CloudEvent：新上傳的檔名（由 Eventarc 送來）")
+    bucket: str | None = Field(None, description="CloudEvent：值區名稱（由 Eventarc 送來）")
+
+
+class ImportFailed(Exception):
+    pass
 
 
 @app.post("/api/import")
-def import_questions(req: ImportRequest):
+def import_questions(req: ImportRequest, ce_type: str | None = Header(None)):
+    """匯入題庫。同一個端點支援兩種觸發方式：
+
+    - 管理頁面按「匯入」：body 是 {"object": "<檔名>"}
+    - Eventarc（v1.1 起）：值區有新檔案時自動送來 CloudEvent，標頭有 ce-type，body 有 name、bucket
+    """
+    if ce_type:
+        return import_from_event(req, ce_type)
+
+    if not req.object:
+        raise HTTPException(422, "請提供 object（值區裡的 CSV 檔名）")
     try:
-        data = bucket.download(req.object)
+        return run_import(req.object, trigger="manual")
+    except ImportFailed as e:
+        raise HTTPException(400, str(e))
+
+
+def import_from_event(req: ImportRequest, ce_type: str) -> dict:
+    """處理 Eventarc 送來的事件。
+
+    這裡一律回 200：回傳錯誤碼會讓 Eventarc 一直重送同一個事件。
+    匯入失敗的原因寫在 ERROR 紀錄裡，到 Logs Explorer 查。
+    """
+    name = req.name or ""
+    if req.bucket != bucket_name() or not name.lower().endswith(".csv"):
+        log("INFO", f"略過事件 {ce_type}：{req.bucket}/{name} 不是題庫 CSV",
+            event="import", trigger="eventarc", object=name)
+        return {"skipped": True, "object": name}
+    try:
+        return run_import(name, trigger="eventarc")
+    except ImportFailed as e:
+        return {"object": name, "error": str(e)}
+
+
+def run_import(object_name: str, trigger: str) -> dict:
+    """下載值區裡的 CSV、解析、寫進 Firestore。trigger 是 manual 或 eventarc，會寫進紀錄。"""
+    try:
+        data = bucket.download(object_name)
     except Exception as e:
-        log("ERROR", f"無法讀取 {req.object}：{e}", event="import", object=req.object)
-        raise HTTPException(400, f"無法讀取 {req.object}：{e}")
+        log("ERROR", f"無法讀取 {object_name}：{e}", event="import", trigger=trigger, object=object_name)
+        raise ImportFailed(f"無法讀取 {object_name}：{e}")
 
     try:
         result = questions_csv.parse_csv_bytes(data)
     except (ValueError, UnicodeDecodeError) as e:
-        log("ERROR", f"{req.object} 格式錯誤：{e}", event="import", object=req.object)
-        raise HTTPException(400, f"{req.object} 格式錯誤：{e}")
+        log("ERROR", f"{object_name} 格式錯誤：{e}", event="import", trigger=trigger, object=object_name)
+        raise ImportFailed(f"{object_name} 格式錯誤：{e}")
 
     # 格式錯誤的列跳過，每一列寫一筆 WARNING，不中斷匯入
     for err in result.errors:
-        log("WARNING", f"{req.object} 第 {err.line} 行略過：{err.reason}",
-            event="import", object=req.object, line=err.line, reason=err.reason)
+        log("WARNING", f"{object_name} 第 {err.line} 行略過：{err.reason}",
+            event="import", trigger=trigger, object=object_name, line=err.line, reason=err.reason)
 
     imported = store.save_questions(result.questions)
-    log("INFO", f"{req.object} 匯入 {imported} 題，略過 {len(result.errors)} 列",
-        event="import", object=req.object, imported=imported, skipped=len(result.errors))
+    log("INFO", f"{object_name} 匯入 {imported} 題，略過 {len(result.errors)} 列",
+        event="import", trigger=trigger, object=object_name, imported=imported, skipped=len(result.errors))
     return {
-        "object": req.object,
+        "object": object_name,
         "imported": imported,
         "skipped": [{"line": e.line, "reason": e.reason} for e in result.errors],
     }
