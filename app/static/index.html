@@ -38,6 +38,19 @@
     <div id="comment-box" class="hidden"><br><strong>講師評語</strong><pre id="comment"></pre></div>
   </section>
 
+  <!-- v2 起：問 AI 為什麼對或錯 -->
+  <section id="ai" class="card hidden">
+    <button id="ask-ai">問 AI 為什麼</button>
+    <label class="muted"><input type="checkbox" id="ungrounded"> 對照實驗：不告訴 AI 正確答案</label>
+    <pre id="ai-stream" class="muted hidden"></pre>
+    <div id="ai-answer" class="hidden">
+      <p><strong>結論</strong>：<span id="ai-conclusion"></span></p>
+      <p><strong>關鍵觀念</strong>：<span id="ai-concept"></span></p>
+      <ul id="ai-options"></ul>
+    </div>
+    <p id="ai-error" class="result-bad hidden"></p>
+  </section>
+
   <p id="message" class="muted"></p>
 </main>
 
@@ -67,6 +80,7 @@ function start() {
 async function nextQuestion() {
   $("message").textContent = "";
   show("result", false);
+  show("ai", false);
   try {
     current = await api("/api/question");
   } catch (e) {
@@ -119,6 +133,7 @@ async function nextQuestion() {
 
 async function submit() {
   const choice = [...document.querySelectorAll("input[name=choice]:checked")].map((i) => i.value).join("");
+  lastChoice = choice;
   if (!choice) { $("message").textContent = "請先選擇答案"; return; }
   $("message").textContent = "";
   $("submit").disabled = true;
@@ -153,6 +168,8 @@ function showResult(r) {
   show("explanation-box", !!r.explanation);
   show("comment-box", !!r.expert_comment);
   show("result", true);
+  resetAi();
+  show("ai", true);
   show("submit", false);
   show("next", true);
 }
@@ -161,6 +178,64 @@ $("start").onclick = start;
 $("nickname").onkeydown = (e) => { if (e.key === "Enter") start(); };
 $("submit").onclick = submit;
 $("next").onclick = nextQuestion;
+// ---------- 問 AI（v2 起） ----------
+let lastChoice = "";
+
+function resetAi() {
+  $("ask-ai").disabled = false;
+  for (const id of ["ai-stream", "ai-answer", "ai-error"]) show(id, false);
+}
+
+async function askAi() {
+  resetAi();
+  $("ask-ai").disabled = true;
+  $("ai-stream").textContent = "";
+  show("ai-stream", true);
+  try {
+    const res = await fetch("/api/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nickname: localStorage.getItem("nickname"),
+        question_id: current.question_id,
+        choice: lastChoice,
+        grounded: !$("ungrounded").checked,
+      }),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+
+    // 串流：AI 一邊產生，畫面一邊顯示收到的文字
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let text = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      text += decoder.decode(value, { stream: true });
+      $("ai-stream").textContent = text;
+    }
+
+    // 收完之後，把 JSON（結構化輸出）分欄顯示
+    const answer = JSON.parse(text);
+    $("ai-conclusion").textContent = answer.conclusion;
+    $("ai-concept").textContent = answer.key_concept;
+    $("ai-options").innerHTML = "";
+    for (const o of answer.options) {
+      const li = document.createElement("li");
+      li.textContent = `(${o.key}) ${o.note}`;
+      $("ai-options").append(li);
+    }
+    show("ai-stream", false);
+    show("ai-answer", true);
+  } catch (e) {
+    $("ai-error").textContent = e instanceof SyntaxError ? "AI 忙線中，請稍後再試" : e.message;
+    show("ai-error", true);
+  } finally {
+    $("ask-ai").disabled = false;
+  }
+}
+
+$("ask-ai").onclick = askAi;
 $("change-name").onclick = () => { show("quiz", false); show("result", false); show("nickname-box", true); };
 
 // 之前輸入過暱稱就直接開始

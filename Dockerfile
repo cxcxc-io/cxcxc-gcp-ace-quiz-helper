@@ -2,7 +2,7 @@
 FROM python:3.14-slim
 
 # 映像檔版本，會寫進每一筆紀錄的 app_version，也會顯示在畫面上
-ARG APP_VERSION=v1.1
+ARG APP_VERSION=v2
 ENV APP_VERSION=${APP_VERSION} \
     PORT=8080 \
     PYTHONUNBUFFERED=1 \

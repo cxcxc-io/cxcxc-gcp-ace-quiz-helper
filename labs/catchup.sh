@@ -5,6 +5,7 @@
 #   bash labs/catchup.sh 1     # 準備好 Lab 1 的起點（Lab 0 的成果）
 #   bash labs/catchup.sh 2     # 準備好 Lab 2 的起點（Lab 0、Lab 1 的成果）
 #   bash labs/catchup.sh 3     # 準備好 Lab 3 的起點（Lab 0～2 的成果）
+#   bash labs/catchup.sh 4     # 準備好 Lab 4 的起點（Lab 0～3 的成果）
 #
 # - 只給跟不上進度的學員用；照 Lab 一步步做的學員不需要執行
 # - 一開始會列出你的專案讓你選，選好後自動切換（gcloud config set project）
@@ -217,9 +218,30 @@ catchup_lab2() {
   build_image v1.1 lab-2
 }
 
+# ---------- Lab 3 的成果（Lab 4 以後都需要） ----------
+catchup_lab3() {
+  local sa_email="quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com"
+  local image="${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1.1"
+
+  step "Lab 3｜啟用 Cloud Run API"
+  gcloud services enable run.googleapis.com
+
+  step "Lab 3｜Cloud Run 服務 quiz-helper（v1.1）"
+  if gcloud run services describe quiz-helper --region="${REGION}" >/dev/null 2>&1; then
+    skip
+  else
+    gcloud run deploy quiz-helper \
+      --image="${image}" \
+      --region="${REGION}" \
+      --service-account="${sa_email}" \
+      --no-invoker-iam-check
+  fi
+}
+
 if (( TARGET >= 1 )); then catchup_lab0; fi
 if (( TARGET >= 2 )); then catchup_lab1; fi
 if (( TARGET >= 3 )); then catchup_lab2; fi
+if (( TARGET >= 4 )); then catchup_lab3; fi
 
 echo
 echo "完成：Lab ${TARGET} 的起點已準備好。"

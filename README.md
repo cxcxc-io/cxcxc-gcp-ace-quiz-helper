@@ -35,6 +35,7 @@ app/                應用程式碼
   store.py          Firestore 讀寫
   bucket.py         Cloud Storage：自動建立值區、讀取 CSV
   logs.py           結構化紀錄（標準輸出印 JSON）
+  ai.py             問 AI：呼叫 Gemini（v2 起）
   static/           答題頁面與管理頁面
 Dockerfile
 data/questions.csv  範例題庫
@@ -72,6 +73,8 @@ tests/              單元測試
 | `APP_VERSION` | v1 | 映像檔版本，會寫進每筆紀錄 |
 | `BUCKET_NAME` | `<專案 ID>-gcp-ace-cxcxc` | 覆寫值區名稱（講師用，平常不用設） |
 | `GOOGLE_CLOUD_PROJECT` | 自動取得 | 覆寫專案 ID（平常不用設） |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | 問 AI 使用的 Gemini 模型（v2 起），換模型只改這個變數 |
+| `GEMINI_LOCATION` | `global` | Gemini 的呼叫位置（v2 起） |
 
 ## 在本機跑單元測試
 

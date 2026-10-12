@@ -8,19 +8,22 @@ API：
   GET  /healthz              健康檢查
   GET  /api/question         隨機取一題（不含答案）
   POST /api/answer           作答，回傳對錯與正確答案
+  POST /api/explain          問 AI 為什麼對或錯（v2 起，串流回傳 JSON）
   GET  /api/admin/csv-files  列出值區裡的 CSV
   POST /api/import           把值區裡的 CSV 匯入 Firestore（管理頁面手動觸發，或 Eventarc 自動觸發）
 """
 
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import bucket, questions_csv, store
+from . import ai, bucket, questions_csv, store
 from .config import APP_VERSION, bucket_name, runtime
 from .logs import log
 
@@ -116,6 +119,70 @@ def post_answer(a: Answer):
         "explanation": q.get("explanation", ""),
         "expert_comment": q.get("expert_comment", ""),
     }
+
+
+# ---------- 問 AI（v2 起） ----------
+
+AI_LIMIT_PER_HOUR = 20   # 每個暱稱每小時最多問幾次（防濫用）
+
+
+class ExplainRequest(BaseModel):
+    nickname: str = Field(min_length=1, max_length=30)
+    question_id: str
+    choice: str = Field(description="學員選的選項，例如 B")
+    grounded: bool = Field(True, description="是否把正確答案告訴 AI；false 是對照實驗")
+
+
+@app.post("/api/explain")
+def explain(req: ExplainRequest):
+    q = store.get_question(req.question_id)
+    if q is None:
+        raise HTTPException(404, "找不到這一題")
+
+    nickname = req.nickname.strip()
+    hour = datetime.now(timezone.utc).strftime("%Y%m%d%H")
+    if not store.take_ai_quota(nickname, hour, AI_LIMIT_PER_HOUR):
+        raise HTTPException(429, f"每個暱稱每小時最多問 AI {AI_LIMIT_PER_HOUR} 次，請稍後再試")
+
+    choice = questions_csv.normalize_answer(req.choice)
+    usage: dict = {}
+    start = time.monotonic()
+    chunks = ai.stream_explanation(q, choice, req.grounded, usage)
+
+    # 先拿到第一段回應：逾時、超過配額（429）等錯誤會在這裡發生，直接回「AI 忙線中」
+    try:
+        first = next(chunks, "")
+    except Exception as e:
+        log("ERROR", f"問 AI 失敗：{e}", event="ai_explain", nickname=nickname,
+            question_id=req.question_id, model=ai.MODEL, error=str(e))
+        raise HTTPException(503, "AI 忙線中，請稍後再試（答題功能不受影響）")
+
+    def body():
+        error = ""
+        try:
+            yield first
+            yield from chunks
+        except Exception as e:   # 回答到一半出錯
+            error = str(e)
+            yield "\n[AI 忙線中]"
+        finally:
+            # 每次問 AI 寫一筆紀錄：用了多少 token、花了多久
+            log("ERROR" if error else "INFO",
+                f"{nickname} 問 AI {req.question_id}：輸入 {usage.get('input_tokens', 0)}、輸出 {usage.get('output_tokens', 0)} token",
+                event="ai_explain",
+                nickname=nickname,
+                question_id=req.question_id,
+                correct=choice == q["answer"],
+                grounded=req.grounded,
+                model=ai.MODEL,
+                input_tokens=usage.get("input_tokens", 0),
+                output_tokens=usage.get("output_tokens", 0),
+                thinking_tokens=usage.get("thinking_tokens", 0),
+                latency_ms=int((time.monotonic() - start) * 1000),
+                **({"error": error} if error else {}))
+
+    # 串流回應：AI 一邊產生，瀏覽器一邊顯示
+    return StreamingResponse(body(), media_type="text/plain; charset=utf-8")
 
 
 # ---------- 題庫匯入 ----------
