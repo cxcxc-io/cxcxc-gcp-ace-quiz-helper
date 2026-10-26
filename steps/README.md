@@ -11,5 +11,6 @@
 | 組織帳號設計 | [`組織帳號設計/`](組織帳號設計/) | Lab 0 的開工準備（專案、Cloud Shell、預算） |
 | IAM 身分與存取管理 | [`IAM身分與存取管理/`](IAM身分與存取管理/) | 盤點權限、授權給督導的人、小幫手的服務帳戶與角色（Lab 1 步驟 3～5 的前半，權限先給寬） |
 | Cloud Storage 物件儲存 | [`CloudStorage物件儲存/`](CloudStorage物件儲存/) | 手動建立小幫手的值區、上傳題庫、存取控制（零信任）、版本管理與生命週期 |
+| Compute Engine 虛擬機器 | [`ComputeEngine虛擬機器/`](ComputeEngine虛擬機器/) | 啟用 API、先照做打包與建 Firestore、建立 VM、匯入題庫答題、連進 VM、查詢中繼資料 |
 
 檔名前面的數字是做的順序。
