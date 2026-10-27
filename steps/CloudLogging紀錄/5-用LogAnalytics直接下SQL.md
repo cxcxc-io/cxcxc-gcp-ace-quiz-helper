@@ -1,4 +1,4 @@
-# 6. 用 Log Analytics 直接下 SQL
+# 5. 用 Log Analytics 直接下 SQL
 
 > 對應講義：Cloud Logging → Lab 實作 →「用 Log Analytics 直接下 SQL」
 

@@ -1,4 +1,4 @@
-# 5. 把答題紀錄送進 BigQuery
+# 4. 把答題紀錄送進 BigQuery
 
 > 對應講義：Cloud Logging → Lab 實作 →「把答題紀錄送進 BigQuery」
 
