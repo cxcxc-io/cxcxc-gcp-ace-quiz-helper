@@ -15,5 +15,6 @@
 | IAM 進階：自建服務帳戶與模擬 | [`IAM進階自建服務帳戶與模擬/`](IAM進階自建服務帳戶與模擬/) | 自訂角色收斂權限、有期限的督導權限、兩人一組的開發人員模擬 |
 | VPC 網路 | [`VPC網路/`](VPC網路/) | 拿掉 http-server 標記、自建小幫手防火牆規則並看記錄、SSH 只走 IAP、OS Login（兩人一組） |
 | Cloud Monitoring 監控 | [`CloudMonitoring監控/`](CloudMonitoring監控/) | COS 的 Node Problem Detector、Ubuntu 練習 VM 裝 Ops Agent、運作時間檢查與警示、演練小幫手掛了、資訊主頁 |
+| Cloud Logging 紀錄 | [`CloudLogging紀錄/`](CloudLogging紀錄/) | 答題紀錄、管理活動與資料存取稽核紀錄（含模擬的委派鏈）、紀錄型指標、接收器送 BigQuery、Log Analytics |
 
 檔名前面的數字是做的順序。
