@@ -5,7 +5,7 @@
 > Dify 是開源的 LLM 應用開發平台，可以在網頁上用點擊組出 agent、知識庫與工作流程。這一份只負責把它自動架在一台 Compute Engine VM 上；架好之後怎麼用，跟著課堂操作。
 >
 > - **需要的角色**：專案擁有者，或 Compute 管理員＋安全性管理員（建立防火牆規則）
-> - **費用**：一台 e2-standard-2 VM 與 50 GB 磁碟，開著就按時計費；**下課做 [2-收攤](2-收攤.md)**
+> - **費用**：一台 e2-standard-4 VM（4 vCPU、16 GB）與 50 GB 磁碟，開著就按時計費；**下課做 [2-收攤](2-收攤.md)**
 
 ## 開始前：確認 Cloud Shell 在你的專案
 
@@ -104,12 +104,12 @@ gcloud compute firewall-rules create allow-dify-http \
 
 ## 步驟 4：建立 Dify 的 VM
 
-對應講義：Compute Engine →「建立執行個體」：名稱 dify-lab、e2-standard-2、Ubuntu 24.04 LTS、磁碟 50 GB、網路標記 dify-lab、開機指令碼貼上步驟 2 的內容。
+對應講義：Compute Engine →「建立執行個體」：名稱 dify-lab、e2-standard-4、Ubuntu 24.04 LTS、磁碟 50 GB、網路標記 dify-lab、開機指令碼貼上步驟 2 的內容。
 
 ```bash
 gcloud compute instances create dify-lab \
   --zone=${ZONE} \
-  --machine-type=e2-standard-2 \
+  --machine-type=e2-standard-4 \
   --image-family=ubuntu-2404-lts-amd64 \
   --image-project=ubuntu-os-cloud \
   --boot-disk-size=50GB \
@@ -118,7 +118,7 @@ gcloud compute instances create dify-lab \
   --metadata-from-file=startup-script=${HOME}/dify-startup.sh
 ```
 
-- `e2-standard-2`：2 個 vCPU、8 GB 記憶體。Dify 官方的最低需求是 2 核心、4 GiB，它會同時跑十幾個容器，記憶體給多一點比較穩
+- `e2-standard-4`：4 個 vCPU、16 GB 記憶體。Dify 官方寫的最低需求是 2 核心、4 GiB，但它會同時跑十幾個容器（API、worker、資料庫、向量資料庫、外掛、沙箱…），實際上記憶體低於 16 GB 容易卡住或容器被系統砍掉。想省一點可以改 `e2-highmem-2`（2 vCPU、16 GB），記憶體一樣、CPU 少一半
 - `--boot-disk-size=50GB`：Dify 的容器映像檔加起來有好幾 GB，預設的 10 GB 不夠
 - `--metadata=...`：把版本與初始化密碼放進中繼資料，給開機指令碼讀取
 - `--metadata-from-file=startup-script=...`：步驟 2 的開機指令碼
