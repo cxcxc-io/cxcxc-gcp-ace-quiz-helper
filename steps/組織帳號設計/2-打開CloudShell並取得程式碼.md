@@ -96,7 +96,7 @@ git checkout lab-0
 新開的 Cloud Shell 沒有之前設的變數，括號裡也可能不是上課用的專案。照 [1-確認專案與帳單帳戶](1-確認專案與帳單帳戶.md) 的步驟 2、3 重新設定：
 
 ```bash
-gcloud config set project <你的專案 ID>
+gcloud config set project "你的專案ID"
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
 ```

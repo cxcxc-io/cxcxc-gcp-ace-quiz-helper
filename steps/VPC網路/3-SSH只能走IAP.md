@@ -2,6 +2,21 @@
 
 > 對應講義：VPC 網路 → Lab 實作 →「SSH 只能走 IAP」
 
+## 開始前：確認 Cloud Shell 在你的專案
+
+講義沒有對應的 Console 動作。Cloud Shell 不一定停在這門課的專案（重開 Cloud Shell、從別的專案頁面打開、或之前切換過專案都可能），所以每一份都先執行這一段，順便把這一份要用的變數設好。
+
+```bash
+gcloud config set project "你的專案ID"
+export PROJECT_ID=$(gcloud config get-value project)
+export ZONE=asia-east1-b
+echo "目前專案：${PROJECT_ID}"
+```
+
+- `"你的專案ID"`：換成你的專案 ID（Console 上方的專案選單看得到），雙引號保留
+
+**你應該會看到**：`Updated property [core/project].`，接著印出你的專案 ID。出現 `WARNING: You do not appear to have access to project` 代表專案 ID 打錯了。
+
 ## 步驟 1：建立只允許 IAP 的 SSH 規則
 
 對應講義：建立 allow-iap-ssh。

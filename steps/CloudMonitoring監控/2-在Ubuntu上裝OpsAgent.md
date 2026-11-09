@@ -2,6 +2,21 @@
 
 > 對應講義：Cloud Monitoring → Lab 實作 →「在 Ubuntu 上裝 Ops Agent」
 
+## 開始前：確認 Cloud Shell 在你的專案
+
+講義沒有對應的 Console 動作。Cloud Shell 不一定停在這門課的專案（重開 Cloud Shell、從別的專案頁面打開、或之前切換過專案都可能），所以每一份都先執行這一段，順便把這一份要用的變數設好。
+
+```bash
+gcloud config set project "你的專案ID"
+export PROJECT_ID=$(gcloud config get-value project)
+export ZONE=asia-east1-b
+echo "目前專案：${PROJECT_ID}"
+```
+
+- `"你的專案ID"`：換成你的專案 ID（Console 上方的專案選單看得到），雙引號保留
+
+**你應該會看到**：`Updated property [core/project].`，接著印出你的專案 ID。出現 `WARNING: You do not appear to have access to project` 代表專案 ID 打錯了。
+
 ## 步驟 1：建立練習 VM 專用的服務帳戶
 
 對應講義：建立服務帳戶 ops-agent-demo，角色加入記錄寫入者與 Monitoring 指標寫入者。
@@ -40,6 +55,8 @@ bash add-google-cloud-ops-agent-repo.sh --also-install'
 ```
 
 - `--image-family=ubuntu-2404-lts-amd64`、`--image-project=ubuntu-os-cloud`：Ubuntu 24.04 LTS
+
+> **Ops Agent 只支援特定的作業系統版本**：Ubuntu 只支援 LTS 版（目前是 22.04、24.04、26.04），Console 的作業系統清單裡也有版本號後面沒有「LTS」的版本，選到那些版本 Ops Agent 會裝不起來，用 Console 建立時請自己注意；最新的支援清單以官方文件 [Ops Agent overview](https://docs.cloud.google.com/stackdriver/docs/solutions/agents/ops-agent) 的「Operating systems」為準。
 - `--metadata=startup-script=...`：開機指令碼。下載 Google 提供的安裝程式，`--also-install` 代表加入套件來源後順便安裝 Ops Agent。Console 勾選「安裝 Ops Agent」做的是同一件事
 
 ## 步驟 3：確認 Ops Agent 已安裝

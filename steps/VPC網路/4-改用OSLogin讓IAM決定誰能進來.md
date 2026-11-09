@@ -4,6 +4,22 @@
 >
 > 兩人一組：步驟 1～4 由**管理員（你）**執行，步驟 5～6 由**同學**在他自己的 Cloud Shell 執行。
 
+## 開始前：確認 Cloud Shell 在你的專案
+
+講義沒有對應的 Console 動作。Cloud Shell 不一定停在這門課的專案（重開 Cloud Shell、從別的專案頁面打開、或之前切換過專案都可能），所以每一份都先執行這一段，順便把這一份要用的變數設好。
+
+```bash
+gcloud config set project "你的專案ID"
+export PROJECT_ID=$(gcloud config get-value project)
+export ZONE=asia-east1-b
+export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
+echo "目前專案：${PROJECT_ID}"
+```
+
+- `"你的專案ID"`：換成你的專案 ID（Console 上方的專案選單看得到），雙引號保留
+
+**你應該會看到**：`Updated property [core/project].`，接著印出你的專案 ID。出現 `WARNING: You do not appear to have access to project` 代表專案 ID 打錯了。
+
 ## 管理員（你）的部分
 
 ### 步驟 1：在這台 VM 開啟 OS Login
@@ -35,7 +51,7 @@ gcloud compute ssh quiz-helper-vm --zone=${ZONE} --tunnel-through-iap --command=
 對應講義：在「IAM」頁面授予 Compute OS 登入、IAP 保護的通道使用者、Compute 檢視者。
 
 ```bash
-export DEVELOPER=<同學的 Google 帳號 email>
+export DEVELOPER="同學的Google帳號email"
 for ROLE in roles/compute.osLogin roles/iap.tunnelResourceAccessor roles/compute.viewer; do
   gcloud projects add-iam-policy-binding ${PROJECT_ID} \
     --member="user:${DEVELOPER}" \
@@ -68,7 +84,7 @@ gcloud iam service-accounts add-iam-policy-binding ${SA_EMAIL} \
 對應講義：同學照指令版，透過 IAP 連進你的 quiz-helper-vm。
 
 ```bash
-export TARGET_PROJECT=<管理員的專案 ID>
+export TARGET_PROJECT="管理員的專案ID"
 gcloud compute ssh quiz-helper-vm \
   --project=${TARGET_PROJECT} \
   --zone=asia-east1-b \

@@ -4,6 +4,24 @@
 >
 > 先完成 [0-開始前](0-開始前.md)。
 
+## 開始前：確認 Cloud Shell 在你的專案
+
+講義沒有對應的 Console 動作。Cloud Shell 不一定停在這門課的專案（重開 Cloud Shell、從別的專案頁面打開、或之前切換過專案都可能），所以每一份都先執行這一段，順便把這一份要用的變數設好。
+
+```bash
+gcloud config set project "你的專案ID"
+export PROJECT_ID=$(gcloud config get-value project)
+export REGION=asia-east1
+export ZONE=asia-east1-b
+export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
+export IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1
+echo "目前專案：${PROJECT_ID}"
+```
+
+- `"你的專案ID"`：換成你的專案 ID（Console 上方的專案選單看得到），雙引號保留
+
+**你應該會看到**：`Updated property [core/project].`，接著印出你的專案 ID。出現 `WARNING: You do not appear to have access to project` 代表專案 ID 打錯了。
+
 ## 步驟 1：確認有開放 80 埠的防火牆規則
 
 對應講義：勾選「允許 HTTP 流量」。這個勾選做了兩件事：幫 VM 加上 `http-server` 標記，以及在規則不存在時，建立一條對 `http-server` 標記開放 80 埠的防火牆規則 `default-allow-http`。用指令建立 VM 時，規則要自己確認。
