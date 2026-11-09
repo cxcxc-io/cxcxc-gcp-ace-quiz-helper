@@ -19,5 +19,6 @@
 | DevSecOps 架構：軟體供應鏈 | [`DevSecOps軟體供應鏈/`](DevSecOps軟體供應鏈/) | 切到 lab-2、用 Cloud Build 打包 v1.1，回頭看建置服務帳戶、上傳的原始碼與 Artifact Registry 的標記和摘要（Lab 2 步驟 1 與步驟 8 的建置）；收掉 VM 與運作時間檢查（Lab 1 的清理） |
 | 微服務架構：GKE | [`GKE微服務架構/`](GKE微服務架構/) | 節點進貨權限與 Autopilot 叢集、Workload Identity 直接授權後部署 v1、滾動更新到 v1.1、增減與刪除 Pod 並查紀錄、收攤（Lab 2 步驟 2～10 與清理） |
 | Cloud Run：部署、改版與自動調度 | [`CloudRun部署改版與自動調度/`](CloudRun部署改版與自動調度/) | 部署 v1.1 到 Cloud Run、看執行個體縮到零、修改答錯次數指標的篩選器納入 Cloud Run（Lab 3） |
+| AI 代理架構（非 ACE 考點） | [`AI代理架構/`](AI代理架構/) | 用開機指令碼在 Compute Engine 自動架好 Dify（指定版本、初始化密碼、防火牆）、收攤；Dify 的操作由課堂帶 |
 
 檔名前面的數字是做的順序。
