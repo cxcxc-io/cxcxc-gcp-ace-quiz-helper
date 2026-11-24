@@ -12,16 +12,21 @@ set -euo pipefail
 METADATA_URL="http://metadata.google.internal/computeMetadata/v1/instance/attributes"
 
 # 1. 從中繼資料伺服器讀出要執行的映像檔，例如
-#    asia-east1-docker.pkg.dev/<專案 ID>/quiz-helper/quiz-helper:v1
+#    docker.io/b97607065/quiz-helper:vm（課程用，講師放在 Docker Hub 的公開映像檔）
+#    asia-east1-docker.pkg.dev/<專案 ID>/quiz-helper/quiz-helper:v1（放在自己的 Artifact Registry）
 IMAGE=$(curl -sf -H "Metadata-Flavor: Google" "${METADATA_URL}/quiz-helper-image")
-REGISTRY="${IMAGE%%/*}"   # 取出第一段：asia-east1-docker.pkg.dev
+REGISTRY="${IMAGE%%/*}"   # 取出第一段，例如 docker.io 或 asia-east1-docker.pkg.dev
 echo "quiz-helper：準備執行 ${IMAGE}"
 
-# 2. 讓 docker 用 VM 附加的服務帳戶登入 Artifact Registry（不需要任何金鑰）。
-#    COS 的根目錄是唯讀的，所以把 docker 的設定放在可寫入的 /var 底下。
+# 2. COS 的根目錄是唯讀的，所以把 docker 的設定放在可寫入的 /var 底下。
 export HOME=/var/lib/quiz-helper
 mkdir -p "${HOME}"
-docker-credential-gcr configure-docker --registries="${REGISTRY}"
+
+#    映像檔放在 Artifact Registry（*.pkg.dev）時，讓 docker 用 VM 附加的服務帳戶登入（不需要任何金鑰）。
+#    Docker Hub 的公開映像檔不用登入，直接拉取。
+if [[ "${REGISTRY}" == *.pkg.dev ]]; then
+  docker-credential-gcr configure-docker --registries="${REGISTRY}"
+fi
 
 # 3. 拉取映像檔（剛開機時網路可能還沒好，失敗就等幾秒再試）
 for i in 1 2 3 4 5; do
