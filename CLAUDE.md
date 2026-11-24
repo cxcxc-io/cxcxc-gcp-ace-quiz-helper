@@ -60,5 +60,5 @@
 ## 版本命名
 
 - git tag：`lab-0`～`lab-6`（一般打在 `main` 上；修正舊 Lab 時打在只含該 Lab 修正的 commit 上；實測通過前可移動）
-- 容器映像檔標記：`v1`、`v1.1`、`v2`
+- 容器映像檔標記依章節命名：`vm`（lab-0）、`gke`（lab-2）、`cloudrun`（lab-3，程式與 gke 相同）、`ai`（lab-4）。講師用 `scripts/build-dockerhub.sh` 打包，放在 Docker Hub 公開存放區 `docker.io/b97607065/quiz-helper`，學員直接拉取、不自己打包（2026-11-24 秉鴻決定）。`labs/` 完整版仍寫 v1／v1.1／v2 與 Artifact Registry，照規定不改
 - 兩者刻意分開命名，不要混用
