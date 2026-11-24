@@ -1,4 +1,4 @@
-# 4. 建立 VM，讓小幫手跑起來
+# 3. 建立 VM，讓小幫手跑起來
 
 > 對應講義：Compute Engine 虛擬機器 → Lab 實作 →「建立 VM，讓小幫手跑起來」
 >
@@ -14,7 +14,7 @@ export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
 export ZONE=asia-east1-b
 export SA_EMAIL=quiz-helper@${PROJECT_ID}.iam.gserviceaccount.com
-export IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1
+export IMAGE=docker.io/b97607065/quiz-helper:vm
 echo "目前專案：${PROJECT_ID}"
 ```
 

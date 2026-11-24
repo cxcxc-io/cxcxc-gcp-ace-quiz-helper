@@ -1,6 +1,6 @@
-# 3. 換上新制服：滾動更新到 v1.1
+# 3. 換上新制服：滾動更新到 gke 版
 
-> 對應講義：微服務架構：Google Kubernetes Engine → Lab 實作 →「換上新制服：滾動更新到 v1.1」
+> 對應講義：微服務架構：Google Kubernetes Engine → Lab 實作 →「換上新制服：滾動更新到 gke 版」
 >
 > 先完成 [2-先發識別證再讓小幫手開店](2-先發識別證再讓小幫手開店.md)。
 
@@ -12,7 +12,7 @@
 gcloud config set project "你的專案ID"
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
-export IMAGE_V11=${REGION}-docker.pkg.dev/${PROJECT_ID}/quiz-helper/quiz-helper:v1.1
+export IMAGE_GKE=docker.io/b97607065/quiz-helper:gke
 echo "目前專案：${PROJECT_ID}"
 ```
 
@@ -33,25 +33,25 @@ while true; do echo "$(date +%T) $(curl -s -m 2 http://${LB_IP}/healthz || echo 
 - `while true; do ... sleep 0.5; done`：每 0.5 秒問一次「你是哪一版」
 - `curl -m 2`：2 秒沒回應就算失敗，印出「連線失敗」
 
-**你應該會看到**：每半秒一行 `{"status":"ok","version":"v1"}`。這個分頁先不要關，下一個小 Lab 還會用到。
+**你應該會看到**：每半秒一行 `{"status":"ok","version":"vm"}`。這個分頁先不要關，下一個小 Lab 還會用到。
 
-## 步驟 2：把映像檔換成 v1.1
+## 步驟 2：把映像檔換成 gke 版
 
 對應講義：回到第一個分頁執行更新（只有指令），在「工作負載」→ quiz-helper 的「修訂版本記錄」看到第二個版本。
 
 ```bash
-kubectl set image deployment/quiz-helper quiz-helper=${IMAGE_V11}
+kubectl set image deployment/quiz-helper quiz-helper=${IMAGE_GKE}
 kubectl rollout status deployment/quiz-helper
 ```
 
-- `kubectl set image`：把 Deployment 裡名為 `quiz-helper` 的容器換成 v1.1 映像檔（DevSecOps 章打包的那一個）
+- `kubectl set image`：把 Deployment 裡名為 `quiz-helper` 的容器換成 gke 版映像檔（講師放在 Docker Hub 的下一版）
 - `kubectl rollout status`：等更新完成才結束
 
 **你應該會看到**：
 
 - 第一個分頁最後印出 `deployment "quiz-helper" successfully rolled out`
-- 第二個分頁先全是 `v1`，接著 `v1` 和 `v1.1` 交錯，最後全是類似 `{"status":"ok","version":"v1.1","platform":"GKE","instance":"quiz-helper-7c9d8f6b5-x2k4p"}`，**整個過程沒有「連線失敗」**
-- v1.1 的回應在 2 個不同的 Pod 名稱之間交替：負載平衡器把流量分給兩個 Pod
-- 手機重新整理，題目上方出現「主題：…｜相關服務：…」，題目下方出現「這一題由 GKE「quiz-helper-…」回應」，右上角版本是 `v1.1`
+- 第二個分頁先全是 `vm`，接著 `vm` 和 `gke` 交錯，最後全是類似 `{"status":"ok","version":"gke","platform":"GKE","instance":"quiz-helper-7c9d8f6b5-x2k4p"}`，**整個過程沒有「連線失敗」**
+- gke 版的回應在 2 個不同的 Pod 名稱之間交替：負載平衡器把流量分給兩個 Pod
+- 手機重新整理，題目上方出現「主題：…｜相關服務：…」，題目下方出現「這一題由 GKE「quiz-helper-…」回應」，右上角版本是 `gke`
 
 > 為什麼不中斷？`deployment.yaml` 的設定是「先多開一個新版 Pod（`maxSurge: 1`），等它通過健康檢查（`readinessProbe`）才關掉一個舊版（`maxUnavailable: 0`）」，任何時候都有能服務的 Pod。

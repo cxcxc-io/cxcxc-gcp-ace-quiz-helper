@@ -1,4 +1,4 @@
-# 6. 連進 VM
+# 5. 連進 VM
 
 > 對應講義：Compute Engine 虛擬機器 → Lab 實作 →「連進 VM」
 

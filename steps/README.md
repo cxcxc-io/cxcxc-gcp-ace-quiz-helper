@@ -11,14 +11,23 @@
 | 組織帳號設計 | [`組織帳號設計/`](組織帳號設計/) | Lab 0 的開工準備（專案、Cloud Shell、預算） |
 | IAM 身分與存取管理 | [`IAM身分與存取管理/`](IAM身分與存取管理/) | 盤點權限、授權給督導的人、小幫手的服務帳戶與角色（Lab 1 步驟 3～5 的前半，權限先給寬） |
 | Cloud Storage 物件儲存 | [`CloudStorage物件儲存/`](CloudStorage物件儲存/) | 手動建立小幫手的值區、上傳題庫、存取控制（零信任）、版本管理與生命週期 |
-| Compute Engine 虛擬機器 | [`ComputeEngine虛擬機器/`](ComputeEngine虛擬機器/) | 啟用 API、先照做打包與建 Firestore、建立 VM、匯入題庫答題、連進 VM、查詢中繼資料 |
+| Compute Engine 虛擬機器 | [`ComputeEngine虛擬機器/`](ComputeEngine虛擬機器/) | 啟用 API、先照做建 Firestore、從 Docker Hub 拉映像檔建立 VM、匯入題庫答題、連進 VM、查詢中繼資料 |
 | IAM 進階：自建服務帳戶與模擬 | [`IAM進階自建服務帳戶與模擬/`](IAM進階自建服務帳戶與模擬/) | 自訂角色收斂權限、有期限的督導權限、兩人一組的開發人員模擬 |
 | VPC 網路 | [`VPC網路/`](VPC網路/) | 拿掉 http-server 標記、自建小幫手防火牆規則並看記錄、SSH 只走 IAP、OS Login（兩人一組） |
 | Cloud Monitoring 監控 | [`CloudMonitoring監控/`](CloudMonitoring監控/) | COS 的 Node Problem Detector、Ubuntu 練習 VM 裝 Ops Agent、運作時間檢查與警示、演練小幫手掛了、資訊主頁 |
 | Cloud Logging 紀錄 | [`CloudLogging紀錄/`](CloudLogging紀錄/) | 答題紀錄、管理活動稽核紀錄、紀錄型指標、接收器送 BigQuery、Log Analytics |
-| DevSecOps 架構：軟體供應鏈 | [`DevSecOps軟體供應鏈/`](DevSecOps軟體供應鏈/) | 切到 lab-2、用 Cloud Build 打包 v1.1，回頭看建置服務帳戶、上傳的原始碼與 Artifact Registry 的標記和摘要（Lab 2 步驟 1 與步驟 8 的建置）；收掉 VM 與運作時間檢查（Lab 1 的清理） |
-| 微服務架構：GKE | [`GKE微服務架構/`](GKE微服務架構/) | 節點進貨權限與 Autopilot 叢集、Workload Identity 直接授權後部署 v1、滾動更新到 v1.1、增減與刪除 Pod 並查紀錄、收攤（Lab 2 步驟 2～10 與清理） |
-| Cloud Run：部署、改版與自動調度 | [`CloudRun部署改版與自動調度/`](CloudRun部署改版與自動調度/) | 部署 v1.1 到 Cloud Run、看執行個體縮到零、修改答錯次數指標的篩選器納入 Cloud Run（Lab 3） |
+| DevSecOps 架構：軟體供應鏈 | [`DevSecOps軟體供應鏈/`](DevSecOps軟體供應鏈/) | 收掉 VM 與運作時間檢查（Lab 1 的清理）；Cloud Build 與 Artifact Registry 由講義正文與課堂講解 |
+| 微服務架構：GKE | [`GKE微服務架構/`](GKE微服務架構/) | 切到 lab-2、節點權限與 Autopilot 叢集、Workload Identity 直接授權後部署 vm 版、滾動更新到 gke 版、增減與刪除 Pod 並查紀錄、收攤（Lab 2 步驟 2～10 與清理） |
+| Cloud Run：部署、改版與自動調度 | [`CloudRun部署改版與自動調度/`](CloudRun部署改版與自動調度/) | 部署 cloudrun 版到 Cloud Run、看執行個體縮到零、修改答錯次數指標的篩選器納入 Cloud Run（Lab 3） |
 | AI 代理架構（非 ACE 考點） | [`AI代理架構/`](AI代理架構/) | 用開機指令碼在 Compute Engine 自動架好 Dify（指定版本、初始化密碼、防火牆）、收攤；Dify 的操作由課堂帶 |
 
 檔名前面的數字是做的順序。
+
+小幫手的映像檔由講師事先打包好，放在 Docker Hub 公開存放區（`docker.io/b97607065/quiz-helper`），學員不用自己打包：
+
+| 標記 | 用在 |
+| --- | --- |
+| `vm` | Compute Engine 章；GKE 章一開始也先部署這一版 |
+| `gke` | GKE 章滾動更新：畫面多顯示「哪個平台、哪個執行個體在回應」 |
+| `cloudrun` | Cloud Run 章（程式與 gke 版相同） |
+

@@ -1,8 +1,8 @@
-# 3. 收掉 VM 上的小幫手
+# 1. 收掉 VM 上的小幫手
 
 > 對應講義：DevSecOps 架構：軟體供應鏈 → Lab 實作 →「收掉 VM 上的小幫手」
 >
-> 先完成 [2-用 Cloud Build 把 v1.1 送進成品倉](2-用CloudBuild把v1.1送進成品倉.md)。下一章小幫手搬到 GKE，VM 用不到了，開著還會一直計費。值區、Firestore 題庫、服務帳戶 `quiz-helper` 與自訂角色，後面幾章還會用到，**不要刪**。
+> 下一章小幫手搬到 GKE，VM 用不到了，開著還會一直計費。值區、Firestore 題庫、服務帳戶 `quiz-helper` 與自訂角色，後面幾章還會用到，**不要刪**。
 
 ## 開始前：確認 Cloud Shell 在你的專案
 

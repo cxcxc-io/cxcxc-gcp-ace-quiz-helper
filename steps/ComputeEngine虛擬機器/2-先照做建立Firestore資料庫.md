@@ -1,4 +1,4 @@
-# 3. 先照做：建立 Firestore 資料庫
+# 2. 先照做：建立 Firestore 資料庫
 
 > 對應講義：Compute Engine 虛擬機器 → Lab 實作 →「先照做：建立 Firestore 資料庫」
 
