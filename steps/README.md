@@ -17,8 +17,8 @@
 | Cloud Monitoring 監控 | [`CloudMonitoring監控/`](CloudMonitoring監控/) | COS 的 Node Problem Detector、Ubuntu 練習 VM 裝 Ops Agent、運作時間檢查與警示、演練小幫手掛了、資訊主頁 |
 | Cloud Logging 紀錄 | [`CloudLogging紀錄/`](CloudLogging紀錄/) | 答題紀錄、管理活動稽核紀錄、紀錄型指標、接收器送 BigQuery、Log Analytics |
 | DevSecOps 架構：軟體供應鏈 | [`DevSecOps軟體供應鏈/`](DevSecOps軟體供應鏈/) | 收掉 VM 與運作時間檢查（Lab 1 的清理）；Cloud Build 與 Artifact Registry 由講義正文與課堂講解 |
-| 微服務架構：GKE | [`GKE微服務架構/`](GKE微服務架構/) | 切到 lab-2、節點權限與 Autopilot 叢集、Workload Identity 直接授權後部署 vm 版、滾動更新到 gke 版、增減與刪除 Pod 並查紀錄、收攤（Lab 2 步驟 2～10 與清理） |
-| Cloud Run：部署、改版與自動調度 | [`CloudRun部署改版與自動調度/`](CloudRun部署改版與自動調度/) | 建 Docker Hub 遠端存放區、部署 cloudrun 版到 Cloud Run、看執行個體縮到零、修改答錯次數指標的篩選器納入 Cloud Run（Lab 3） |
+| 微服務架構：GKE | [`GKE微服務架構/`](GKE微服務架構/) | 切到 lab-2、節點權限、建 Docker Hub 遠端存放區、Autopilot 叢集、Workload Identity 直接授權後部署 vm 版、滾動更新到 gke 版、增減與刪除 Pod 並查紀錄、收攤（Lab 2 步驟 2～10 與清理） |
+| Cloud Run：部署、改版與自動調度 | [`CloudRun部署改版與自動調度/`](CloudRun部署改版與自動調度/) | 部署 cloudrun 版到 Cloud Run、看執行個體縮到零、修改答錯次數指標的篩選器納入 Cloud Run（Lab 3） |
 | AI 代理架構（非 ACE 考點） | [`AI代理架構/`](AI代理架構/) | 用開機指令碼在 Compute Engine 自動架好 Dify（指定版本、初始化密碼、防火牆）、收攤；Dify 的操作由課堂帶 |
 
 檔名前面的數字是做的順序。
@@ -29,5 +29,7 @@
 | --- | --- |
 | `vm` | Compute Engine 章；GKE 章一開始也先部署這一版 |
 | `gke` | GKE 章滾動更新：畫面多顯示「哪個平台、哪個執行個體在回應」 |
-| `cloudrun` | Cloud Run 章（程式與 gke 版相同）。Cloud Run 不能直接拉個人的 Docker Hub 映像檔，要先建 Artifact Registry 遠端存放區 `dockerhub` 代拉 |
+| `cloudrun` | Cloud Run 章（程式與 gke 版相同） |
+
+Compute Engine 章的 VM 直接從 Docker Hub 拉取；從 GKE 章開始，改透過 GKE 章建的 Artifact Registry 遠端存放區 `dockerhub` 代拉（Cloud Run 不能直接部署個人的 Docker Hub 映像檔），映像檔網址寫成 `asia-east1-docker.pkg.dev/<專案ID>/dockerhub/b97607065/quiz-helper:<標記>`。
 

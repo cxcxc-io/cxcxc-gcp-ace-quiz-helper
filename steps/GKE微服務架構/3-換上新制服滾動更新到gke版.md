@@ -12,7 +12,7 @@
 gcloud config set project "你的專案ID"
 export PROJECT_ID=$(gcloud config get-value project)
 export REGION=asia-east1
-export IMAGE_GKE=docker.io/b97607065/quiz-helper:gke
+export IMAGE_GKE=${REGION}-docker.pkg.dev/${PROJECT_ID}/dockerhub/b97607065/quiz-helper:gke
 echo "目前專案：${PROJECT_ID}"
 ```
 
@@ -44,7 +44,7 @@ kubectl set image deployment/quiz-helper quiz-helper=${IMAGE_GKE}
 kubectl rollout status deployment/quiz-helper
 ```
 
-- `kubectl set image`：把 Deployment 裡名為 `quiz-helper` 的容器換成 gke 版映像檔（講師放在 Docker Hub 的下一版）
+- `kubectl set image`：把 Deployment 裡名為 `quiz-helper` 的容器換成 gke 版映像檔（講師放在 Docker Hub 的下一版，一樣透過遠端存放區 `dockerhub` 拉取）
 - `kubectl rollout status`：等更新完成才結束
 
 **你應該會看到**：
